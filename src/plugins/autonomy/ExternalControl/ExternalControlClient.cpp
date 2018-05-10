@@ -47,33 +47,34 @@ namespace autonomy {
 ExternalControlClient::ExternalControlClient(std::shared_ptr<grpc::Channel> channel) :
     stub_(scrimmage_proto::ExternalControl::NewStub(channel)) {}
 
-bool ExternalControlClient::send_environment(scrimmage_proto::Environment &env) {
-
-    if (!stub_) return false;
-
+bool ExternalControlClient::send_environments(scrimmage_proto::Environments &envs) {
     sp::Empty reply;
     grpc::ClientContext context;
-    grpc::Status status = stub_->SendEnvironment(&context, env, &reply);
+    grpc::Status status = stub_->SendEnvironments(&context, envs, &reply);
     return status.ok();
 }
 
-boost::optional<scrimmage_proto::Action>
-ExternalControlClient::send_action_result(
-        scrimmage_proto::ActionResult &action_result) {
+boost::optional<scrimmage_proto::Actions>
+ExternalControlClient::send_action_results(
+        scrimmage_proto::ActionResults &action_results) {
+    // Connection timeout in seconds
+    unsigned int client_connection_timeout = 5;
 
-    if (!stub_) return boost::none;
-
-    sp::Action action;
     grpc::ClientContext context;
-    grpc::Status status = stub_->SendActionResult(&context, action_result, &action);
+
+    // https://github.com/grpc/grpc/issues/3954
+    std::chrono::system_clock::time_point deadline =
+        std::chrono::system_clock::now() + std::chrono::seconds(client_connection_timeout);
+
+    context.set_deadline(deadline);
+
+    sp::Actions actions;
+    grpc::Status status = stub_->SendActionResults(&context, action_results, &actions);
     if (!status.ok()) {
         std::cout << "ExternalControlClient received bad grpc status" << std::endl;
         return boost::none;
-    } else if (action.done()) {
-        // std::cout << "ExternalControlClient received done status" << std::endl;
-        return boost::none;
     } else {
-        return boost::optional<sp::Action>(action);
+        return boost::optional<sp::Actions>(actions);
     }
 }
 } // namespace autonomy

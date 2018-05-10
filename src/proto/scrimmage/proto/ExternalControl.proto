@@ -37,8 +37,8 @@ option java_package = "com.syllo.scrimmage";
 package scrimmage_proto;
 
 service ExternalControl {
-  rpc SendEnvironment (Environment) returns (Empty) {}
-  rpc SendActionResult (ActionResult) returns (Action) {}
+  rpc SendEnvironments (Environments) returns (Empty) {}
+  rpc SendActionResults (ActionResults) returns (Actions) {}
 }
 
 message SingleSpaceParams {
@@ -59,6 +59,10 @@ message Environment {
     double max_reward = 4;
 }
 
+message Environments {
+    repeated Environment envs = 1;
+}
+
 message SpaceSample {
     repeated double value = 1;
 }
@@ -69,10 +73,20 @@ message ActionResult {
     bool done = 3;
 }
 
+message ActionResults {
+    repeated ActionResult action_results = 1;
+    bool done = 2;
+}
+
 message Action {
     repeated int32 discrete = 1;
     repeated double continuous = 2;
     bool done = 3;
+}
+
+message Actions {
+    repeated Action actions = 1;
+    bool done = 2;
 }
 
 message Empty {}

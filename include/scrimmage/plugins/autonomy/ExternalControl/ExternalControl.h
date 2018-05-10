@@ -34,6 +34,7 @@
 #define INCLUDE_SCRIMMAGE_PLUGINS_AUTONOMY_EXTERNALCONTROL_EXTERNALCONTROL_H_
 
 #include <scrimmage/autonomy/Autonomy.h>
+#include <scrimmage/proto/ExternalControl.pb.h>
 
 #include <map>
 #include <string>
@@ -46,54 +47,35 @@ class SpaceParams;
 class ActionResult;
 }
 
-namespace boost {
-template <class T> class optional;
-}
-
 namespace scrimmage {
-class DelayedTask;
 
 namespace autonomy {
 
-class ExternalControlClient;
-
 class ExternalControl : public scrimmage::Autonomy {
  public:
-    ExternalControl();
+    // normal overrides
     void init(std::map<std::string, std::string> &params) override;
     bool step_autonomy(double t, double dt) override;
 
+    // helper functions that do not get overridden
+    scrimmage_proto::ActionResult get_observation(double t);
+    void set_action(const scrimmage_proto::Action &action);
+    scrimmage_proto::Environment get_env();
+
+    // override 2 new functions: calc_reward and action_space_params
+    virtual std::pair<bool, double> calc_reward(double t, double dt);
+
  protected:
-    virtual bool handle_action(
-        double t, double dt, const scrimmage_proto::Action &action);
     virtual scrimmage_proto::SpaceParams action_space_params();
-    virtual std::pair<bool, double> calc_reward(double t);
-    void close(double t) override;
-    virtual scrimmage_proto::ActionResult get_observation(double t);
 
     bool check_action(
         const scrimmage_proto::Action &action,
         uint64_t discrete_action_size,
         uint64_t continuous_action_size);
 
-    std::string server_address_ = "localhost:50051";
+    scrimmage_proto::Action action_;
     double min_reward_ = -std::numeric_limits<double>::infinity();
     double max_reward_ = std::numeric_limits<double>::infinity();
-    bool use_trained_model_ = false;
-
- private:
-    boost::optional<scrimmage_proto::Action>
-        send_action_result(scrimmage_proto::ActionResult &action_result,
-            double reward, bool done);
-    bool send_env();
-
-    std::shared_ptr<ExternalControlClient> external_control_client_;
-    std::shared_ptr<DelayedTask> delayed_task_;
-    double curr_reward = 0;
-    bool env_sent_ = false;
-
-    int num_attempts_ = 0;
-    std::string python_cmd_ = "external_control.py";
 };
 } // namespace autonomy
 } // namespace scrimmage

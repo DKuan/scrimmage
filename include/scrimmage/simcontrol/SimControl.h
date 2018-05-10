@@ -130,6 +130,8 @@ class SimControl {
 
     void set_outgoing_interface(InterfacePtr &outgoing_interface);
 
+    void set_limited_verbosity(bool limited_verbosity);
+
  protected:
     // Key: Entity ID
     // Value: Team ID
@@ -246,6 +248,7 @@ class SimControl {
     bool prev_paused_;
 
     DelayedTask reseed_task_;
+    bool limited_verbosity_;
 };
 } // namespace scrimmage
 #endif // INCLUDE_SCRIMMAGE_SIMCONTROL_SIMCONTROL_H_

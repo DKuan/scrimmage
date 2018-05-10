@@ -9,17 +9,18 @@ import os
 import signal
 import sys
 import xml.etree.ElementTree as ET
-from concurrent import futures
+import importlib
+import argparse
+import platform
 
+import lvdb
+from concurrent import futures
 import numpy as np
 import grpc
 
-import platform
 import gym
 import gym.spaces
 from gym.utils import seeding
-import importlib
-import argparse
 if __name__ == "__main__":
     from scrimmage.proto import ExternalControl_pb2, ExternalControl_pb2_grpc
 else:
@@ -34,13 +35,15 @@ else:
 class ServerThread(threading.Thread):
     """Start SCRIMMAGE ExternalControl GRPC Service."""
 
-    def __init__(self, queues, address, max_workers=10):
+    def __init__(self, queues, address, timeout, max_workers=10):
         """Initialize variables."""
         super(ServerThread, self).__init__()
         self.queues = queues
         self.address = address
         self.max_workers = max_workers
+        self.timeout = timeout
         self.stop = False
+        self.stopped = True
 
     def run(self):
         """Start SCRIMMAGE ExternalControl GRPC Service."""
@@ -48,16 +51,19 @@ class ServerThread(threading.Thread):
             futures.ThreadPoolExecutor(max_workers=self.max_workers))
 
         ExternalControl_pb2_grpc.add_ExternalControlServicer_to_server(
-            ExternalControl(self.queues), server)
+            ExternalControl(self.queues, self.timeout), server)
         server.add_insecure_port(self.address)
+        self.stopped = False
         server.start()
 
         try:
             while not self.stop:
-                time.sleep(1)
+                time.sleep(0.1)
             server.stop(0)
         except KeyboardInterrupt:
             server.stop(0)
+
+        self.stopped = True
 
 
 class ScrimmageEnv(gym.Env):
@@ -66,14 +72,21 @@ class ScrimmageEnv(gym.Env):
     metadata = {'render.modes': ['human']}
 
     def __init__(self, enable_gui, mission_file,
+                 combine_actors=True,
                  num_actors=1, port_offset=1,
-                 address="localhost:50051", gdb_args=""):
+                 address="localhost:50051",
+                 timeout=600,
+                 gdb_args=""):
         """Create queues for multi-threading."""
+        signal.signal(signal.SIGINT, self._signal_handler)
+
         self.enable_gui = enable_gui
         self.mission_file = mission_file
+        self.combine_actors = combine_actors
         self.address = address
         self.gdb_args = gdb_args
         self.num_actors = num_actors
+        self.timeout = timeout
         self.port_offset = port_offset
 
         self.rng = None
@@ -83,36 +96,45 @@ class ScrimmageEnv(gym.Env):
 
         ip, port = address.split(":")
         self.queues = []
-        self.server_threads = []
-        for i in range(num_actors):
-            port = int(port) + i * port_offset
-            address = ip + ":" + str(port)
-            self.queues.append({s: queue.Queue() for s in queue_names})
-            self.server_threads.append(
-                ServerThread(self.queues[-1], address))
-            self.server_threads[-1].start()
+        port = int(port)
+        address = ip + ":" + str(port)
+        self.queues = {s: queue.Queue() for s in queue_names}
+        self.server_thread = ServerThread(self.queues, address, self.timeout)
+        self.server_thread.start()
 
         # startup headless version of scrimmage to get the environment
-        for queues in self.queues:
-            queues['action'].put(ExternalControl_pb2.Action(done=True))
         self.scrimmage_process = self._start_scrimmage(False, True)
 
-        environments = \
-            [self.queues[i]['env'].get() for i in range(num_actors)]
+        envs = self.queues['env'].get(timeout=self.timeout)
+        self.num_actors = len(envs.envs)
+
+        self._clear_queues()
         self._terminate_scrimmage()
+        self._clear_queues()
 
-        if len(environments) == 1:
+        if self.num_actors == 1:
             self.action_space, self.observation_space, self.reward_range = \
-                self._create_spaces(environments[0])
+                self._create_spaces(envs.envs[0])
         else:
-            spaces = [self._create_spaces(e) for e in environments]
-            action_space, observation_space, reward_range = zip(*spaces)
-            self.action_space = gym.spaces.Tuple(action_space)
-            self.observation_space = gym.spaces.Tuple(observation_space)
-            min_rewards, max_rewards = zip(*reward_range)
-            self.reward_range = (min(min_rewards), max(max_rewards))
-
-        signal.signal(signal.SIGINT, self._signal_handler)
+            if self.combine_actors:
+                self._env = ExternalControl_pb2.Environment()
+                for e in envs.envs:
+                    for p in e.action_spaces.params:
+                        self._env.action_spaces.params.extend([p])
+                    for p in e.observation_spaces.params:
+                        self._env.observation_spaces.params.extend([p])
+                self.reward_range = \
+                    (sum([e.min_reward for e in envs.envs]),
+                     sum([e.max_reward for e in envs.envs]))
+                self.action_space, self.observation_space = \
+                    self._create_spaces(self._env)[:2]
+            else:
+                spaces = [self._create_spaces(e) for e in envs.envs]
+                action_space, observation_space, reward_range = zip(*spaces)
+                self.action_space = gym.spaces.Tuple(action_space)
+                self.observation_space = gym.spaces.Tuple(observation_space)
+                min_rewards, max_rewards = zip(*reward_range)
+                self.reward_range = (min(min_rewards), max(max_rewards))
 
     def _create_spaces(self, environment):
         try:
@@ -143,44 +165,38 @@ class ScrimmageEnv(gym.Env):
         self.scrimmage_process = \
             self._start_scrimmage(self.enable_gui, False)
 
-        if self.num_actors == 1:
-            return self._return_action_result(0)[0]
-        else:
-            ret = []
-            for i in range(self.num_actors):
-                ret.append(self._return_action_result(i)[0])
-            return ret
+        return self._return_action_result()[0]
 
     def step(self, action):
         """Send action to SCRIMMAGE and return result."""
-        def _step_single(i, space, a):
+        actions_pb = ExternalControl_pb2.Actions()
+
+        def _add_action(space, a):
             if not isinstance(a, collections.Iterable):
                 a = [a]
 
-            if isinstance(self.action_space, gym.spaces.Box):
-                action_pb =\
+            if isinstance(space, gym.spaces.Box):
+                action_pb = \
                     ExternalControl_pb2.Action(continuous=a, done=False)
             else:
-                action_pb =\
+                action_pb = \
                     ExternalControl_pb2.Action(discrete=a, done=False)
 
-            self.queues[i]['action'].put(action_pb)
+            actions_pb.actions.extend([action_pb])
 
         if self.num_actors == 1:
-            _step_single(0, self.action_space, action)
-            return self._return_action_result(0)
+            _add_action(self.action_space, action)
+        elif self.combine_actors:
+            for a in action:
+                _add_action(self.action_space, a)
         else:
             for i, a in enumerate(action):
-                _step_single(i, self.action_space.spaces[i], a)
+                _add_action(self.action_space.spaces[i], a)
 
-            data = [self._return_action_result(i) for i in range(len(action))]
-            states, rewards, terminals, infos = zip(*data)
-            terminal = any(terminals)
-            reward = sum(rewards)
+        self.queues['action'].put(actions_pb)
+        return self._return_action_result()
 
-            return states, reward, terminal, infos
-
-    def render(self, mode='human', close=False):
+    def _render(self, mode='human', close=False):
         """Ignores a render call but avoids an exception.
 
         If a user wants the environment rendered then the user should
@@ -193,13 +209,12 @@ class ScrimmageEnv(gym.Env):
         return [seed]
 
     def _clear_queues(self):
-        for queues in self.queues:
-            for q in queues.values():
-                _clear_queue(q)
+        for key in self.queues:
+            _clear_queue(self.queues[key])
 
     def _start_scrimmage(self, enable_gui, disable_output):
 
-        ip, port = self.address.split(":")
+        port = self.address.split(":")[1]
         tree = ET.parse(self.mission_file)
         root = tree.getroot()
 
@@ -210,62 +225,28 @@ class ScrimmageEnv(gym.Env):
             seed_node = root.find('seed')
         seed_node.text = str(self.rng.randint(0, 2**32 - 1))
 
+        for nd in root.findall('entity_interaction'):
+            if nd.text == 'ExternalControlInteraction':
+                nd.attrib['server_address'] = self.address
+                break
+
         # enable gui
         run_node = root.find('run')
         run_node.attrib['enable_gui'] = str(enable_gui)
         if not bool(enable_gui):
             run_node.attrib['time_warp'] = "0"
 
-        if self.num_actors > 1:
-            multithreaded_node = root.find("multi_threaded")
-            if multithreaded_node is None:
-                warnings.warn(
-                    ("num_actors > 1 requires multithreading. "
-                     "Adding to mission file."))
-                root.append(ET.Element("multi_threaded"))
-                multithreaded_node = root.find("multi_threaded")
-
-            if ("num_threads" not in multithreaded_node.attrib or
-               int(multithreaded_node.attrib["num_threads"]) == 1):
-                warnings.warn(
-                    "num_actors > 1 requires num_actors threads.")
-                multithreaded_node.attrib["num_threads"] = str(self.num_actors)
-
-            if multithreaded_node.text != "true":
-                warnings.warn(
-                    "num_actors > 1 requires multithreading set to true.")
-                multithreaded_node.text = "true"
-
-        # logging
-        log_node = root.find('log_dir')
-        try:
-            log_node.text = os.path.join(log_node.text, 'external', port)
-        except AttributeError:
-            log_node = ET.Element("log_node")
-            log_node.text = os.path.join('~/.scrimmage/external/logs', port)
-            root.append(log_node)
-
         # disable output
         if disable_output:
             output_node = root.find("output_type")
-            output_node.text = ""
+            output_node.text = " "
+            display_progress_node = root.find("display_progress")
+            display_progress_node.text = "false"
 
-        # set port
-        idx = 0
-        for entity_node in root.findall('entity'):
-            for autonomy_node in entity_node.findall('autonomy'):
-                if 'server_address' in autonomy_node.attrib:
-                    autonomy_node.attrib['server_address'] = \
-                        "{}:{}".format(ip, int(port) + idx * self.port_offset)
-                    idx += 1
-
-        if self.num_actors != 1 and idx != self.num_actors:
-            raise RuntimeError(
-                'num_actors does not match the number of autonomies found ' +
-                'in ' + self.mission_file)
 
         self.temp_mission_file = \
             "." + port + platform.node() + os.path.basename(self.mission_file)
+
         # print('temp mission file is ' + self.temp_mission_file)
         tree.write(self.temp_mission_file)
         if self.gdb_args:
@@ -273,6 +254,8 @@ class ScrimmageEnv(gym.Env):
                 ["scrimmage", self.temp_mission_file]
         else:
             cmd = ["scrimmage", self.temp_mission_file]
+        cmd = ["scrimmage", self.temp_mission_file]
+        # cmd = ['gdb', '-x', '~/scrimmage/.gdbinit', '-f', 'scrimmage']
         # print(cmd)
         return subprocess.Popen(cmd)
 
@@ -283,30 +266,44 @@ class ScrimmageEnv(gym.Env):
         subprocess is the actual scrimmage instance.  This method needs to be
         called in order to make sure a python instance exits cleanly.
         """
-        self._close()
-
-    def _close(self):
-        """Cleanup spawned threads and subprocesses.
-
-        The thread manages a GRPC server to communicate with scrimmage.  The
-        subprocess is the actual scrimmage instance.  This method needs to be
-        called in order to make sure a python instance exits cleanly.
-        """
         self._terminate_scrimmage()
-        for server_thread in self.server_threads:
-            server_thread.stop = True
+        self.server_thread.stop = True
+        while not self.server_thread.stopped:
+            time.sleep(0.1)
 
-    def _return_action_result(self, index):
+    def _return_action_result(self):
         info = {}
         try:
-            res = self.queues[index]['action_response'].get(timeout=60)
+            res = self.queues['action_response'].get(timeout=self.timeout)
         except queue.Empty:
             print('Scrimmage Environment: error getting action result')
-            res = ExternalControl_pb2.ActionResult(done=True)
+            res = ExternalControl_pb2.ActionResults(done=True)
             info['scrimmage_err'] = ""
 
-        obs = np.array(res.observations.value)
-        return obs, res.reward, res.done, {}
+        try:
+            res.action_results
+        except AttributeError:
+            print('returning error')
+            return None, None, True, {}
+
+        if self.num_actors == 1:
+            obs = np.array(res.action_results[0].observations.value)
+            rew = res.action_results[0].reward
+            done = res.action_results[0].done
+        else:
+            rew = [r.reward for r in res.action_results]
+            done = [r.done for r in res.action_results]
+
+            if self.combine_actors:
+                obs = np.array([v for r in res.action_results
+                                for v in r.observations.value])
+                rew = sum(rew)
+                done = any(done)
+            else:
+                obs = [np.array(r.observations.value)
+                       for r in res.action_results]
+
+        return obs, rew, done, {}
 
     def _terminate_scrimmage(self):
         """Terminates scrimmage instance held by the class.
@@ -315,12 +312,10 @@ class ScrimmageEnv(gym.Env):
         shutdown the network to the autonomy in addition to sending a
         sigint.
         """
-        for queues in self.queues:
-            queues['action'].put(ExternalControl_pb2.Action(done=True))
+        self.queues['action'].put(ExternalControl_pb2.Action(done=True))
         self.scrimmage_process.poll()
         while self.scrimmage_process.returncode is None:
-            for queues in self.queues:
-                queues['action'].put(ExternalControl_pb2.Action(done=True))
+            self.queues['action'].put(ExternalControl_pb2.Actions(done=True))
             time.sleep(0.1)
             self.scrimmage_process.poll()
 
@@ -328,25 +323,25 @@ class ScrimmageEnv(gym.Env):
 class ExternalControl(ExternalControl_pb2_grpc.ExternalControlServicer):
     """GRPC Service to communicate with SCRIMMAGE Autonomy."""
 
-    def __init__(self, queues):
+    def __init__(self, queues, timeout):
         """Receive queues for multi-threading."""
         self.queues = queues
+        self.timeout = timeout
 
-    def SendEnvironment(self, env, context):
+    def SendEnvironments(self, env, context):
         """Receive Environment proto and send back an action."""
         self.queues['env'].put(env)
         return ExternalControl_pb2.Empty()
 
-    def SendActionResult(self, action_result, context):
+    def SendActionResults(self, action_results, context):
         """Receive ActionResult proto and send back an action."""
-        self.queues['action_response'].put(action_result)
-        if not action_result.done:
+        self.queues['action_response'].put(action_results)
+        if not any([a.done for a in action_results.action_results]):
             try:
-                action = self.queues['action'].get(timeout=10000.0)
+                action = self.queues['action'].get(timeout=self.timeout)
             except queue.Empty:
                 action = ExternalControl_pb2.Action(done=True)
                 res = ExternalControl_pb2.ActionResult(done=True)
-                self.queues['action_response'].put(res)
         else:
             action = ExternalControl_pb2.Action(done=True)
             res = ExternalControl_pb2.ActionResult(done=True)
@@ -384,7 +379,8 @@ def _create_tuple_space(space_params):
 
     if continuous_extrema:
         low, high = zip(*continuous_extrema)
-        continuous_space = gym.spaces.Box(np.array(low), np.array(high))
+        continuous_space = gym.spaces.Box(
+            np.array(low), np.array(high), dtype=np.float32)
 
     if discrete_extrema and continuous_extrema:
         return gym.spaces.Tuple((discrete_space, continuous_space))
@@ -403,99 +399,3 @@ def _clear_queue(q):
             q.get(False)
     except queue.Empty:
         pass
-
-
-def main():
-    # Get params file, model:class, and port num from args list
-    parser = argparse.ArgumentParser(description=None)
-    parser.add_argument('--xml', default="/tmp/p", help='Parameters file path')
-    parser.add_argument('--actor', type=str,
-                        help='what actor to use for acting. '
-                        'Input in the form module:Class (e.g., '
-                        'load_model:NNModel) and should have the same basic '
-                        'methods/properties as load_model:NNModel')
-    parser.add_argument("--port-num", type=int, default=50052,
-                        help="port to start scrimmage interface on")
-    args = parser.parse_args()
-    # Initizialized variables
-    num_actors = 1
-    port_offset = 1
-    queue_names = ['env', 'action', 'action_response']
-    ip = "localhost"
-    queues = []
-    server_threads = []
-
-    port = args.port_num
-    # Starting up GRPC link
-    for i in range(num_actors):
-        port = int(port) + i * port_offset
-        address = ip + ":" + str(port)
-        queues.append({s: queue.Queue() for s in queue_names})
-        server_threads.append(
-            ServerThread(queues[-1], address))
-        server_threads[-1].start()
-    try:
-        environments = \
-            [queues[i]['env'].get(timeout=10) for i in range(num_actors)]
-    except:
-        for s in server_threads:
-            s.stop = True
-        print('did not receive an environment so closing...')
-        return
-    if len(environments) == 1:
-        action_space = _create_tuple_space(environments[0].action_spaces)
-        observation_space = _create_tuple_space(
-                                            environments[0].observation_spaces)
-    else:
-        action_space = [_create_tuple_space(e.action_spaces)for e in
-                        environments]
-        observation_space = [_create_tuple_space(e.observation_spaces) for e in
-                             environments]
-        action_space = gym.spaces.Tuple(action_space)
-        observation_space = gym.spaces.Tuple(observation_space)
-    # Set up actor model
-    actor_module_str, actor_class_str = args.actor.split(":")
-    actor_module = importlib.import_module(actor_module_str)
-    actor_class = getattr(actor_module, actor_class_str)
-
-    # Actor initialization
-    actor = actor_class(action_space, observation_space, args.xml)
-    while True:
-        # get state from GRPC link
-        try:
-            res = queues[0]['action_response'].get(timeout=60)
-        except queue.Empty:
-            print('Not receiving sensor info from scrimmage')
-            res = ExternalControl_pb2.ActionResult(done=True)
-        if res.done:
-            print("Received end of simulation")
-            for s in server_threads:
-                s.stop = True
-            break
-        obs = np.array(res.observations.value)
-        # get action from actor
-        action = actor.act(obs)
-        # return action to GRPC link
-
-        def _step_single(i, space, a):
-            if not isinstance(a, collections.Iterable):
-                a = [a]
-
-            if isinstance(action_space, gym.spaces.Box):
-                action_pb =\
-                    ExternalControl_pb2.Action(continuous=a, done=False)
-            else:
-                action_pb =\
-                    ExternalControl_pb2.Action(discrete=a, done=False)
-
-            queues[i]['action'].put(action_pb)
-
-        if num_actors == 1:
-            _step_single(0, action_space, action)
-        else:
-            for i, a in enumerate(action):
-                _step_single(i, action_space.spaces[i], a)
-
-
-if __name__ == "__main__":
-    main()

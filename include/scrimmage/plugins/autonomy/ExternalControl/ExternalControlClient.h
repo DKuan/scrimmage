@@ -54,10 +54,10 @@ class ExternalControlClient {
     ExternalControlClient() = default;
     explicit ExternalControlClient(std::shared_ptr<grpc::Channel> channel);
 
-    bool send_environment(scrimmage_proto::Environment &env);
+    bool send_environments(scrimmage_proto::Environments &envs);
 
-    boost::optional<scrimmage_proto::Action>
-    send_action_result(scrimmage_proto::ActionResult &action_result);
+    boost::optional<scrimmage_proto::Actions>
+    send_action_results(scrimmage_proto::ActionResults &action_results);
 
  protected:
     std::unique_ptr<scrimmage_proto::ExternalControl::Stub> stub_;

@@ -153,6 +153,8 @@ int main(int argc, char *argv[]) {
         !output_all && !output_frames && !output_summary &&
         !output_git && !output_mission && !output_seed;
 
+    simcontrol.set_limited_verbosity(output_nothing);
+
     if (!output_nothing) {
         mp->create_log_dir();
     }
@@ -247,6 +249,9 @@ int main(int argc, char *argv[]) {
     // Close the log file
     log->close_log();
 
-    cout << "Simulation Complete" << endl;
+    if (!output_nothing) {
+        cout << "Simulation Complete" << endl;
+    }
     return 0;
 }
+

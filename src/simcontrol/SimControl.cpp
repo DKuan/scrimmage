@@ -591,7 +591,7 @@ bool SimControl::run_networks() {
     for (auto &kv : *networks_) {
         bool result = kv.second->step(pubsub_->pubs()[kv.second->name()],
                                       pubsub_->subs()[kv.second->name()]);
-        if (!result) {
+        if (!result && kv.second->print_err_on_exit) {
             cout << "Network requested simulation termination: "
                  << kv.second->name() << endl;
         }
@@ -608,7 +608,7 @@ bool SimControl::run_interaction_detection() {
 
     auto run_interaction = [&](auto ent_inter) {
         bool result = ent_inter->step_entity_interaction(ents_, t_, dt_);
-        if (!result) {
+        if (!result && ent_inter->print_err_on_exit) {
             cout << "Entity interaction requested simulation termination: "
                  << ent_inter->name() << endl;
         }
@@ -686,6 +686,19 @@ void SimControl::run() {
     set_time(t0_);
     bool end_condition_interaction;
 
+    if (!generate_entities(this->t())) {
+        cout << "Failed to generate entity" << endl;
+        cleanup();
+        return;
+    }
+
+    end_condition_interaction = run_interaction_detection();
+    if (!end_condition_interaction) {
+        auto msg = std::make_shared<Message<sm::EntityInteractionExit>>();
+        pub_ent_int_exit_->publish(msg);
+        cleanup();
+    }
+
     do {
         double t = this->t();
         reseed_task_.update(t);
@@ -704,7 +717,9 @@ void SimControl::run() {
         create_rtree();
         set_autonomy_contacts();
         if (!run_entities()) {
-            std::cout << "Exiting due to plugin request." << std::endl;
+            if (!limited_verbosity_) {
+                std::cout << "Exiting due to plugin request." << std::endl;
+            }
             break;
         }
 
@@ -717,18 +732,23 @@ void SimControl::run() {
         // The networks are run before the metrics, so that messages that are
         // published on the final time stamp can be processed by the metrics.
         if (!run_networks()) {
-            std::cout << "Exiting due to network plugin request."
-                      << std::endl;
+            if (!limited_verbosity_) {
+                std::cout << "Exiting due to network plugin request." << std::endl;
+            }
             break;
         }
 
         if (!run_metrics()) {
-            std::cout << "Exiting due to metrics plugin exception" << std::endl;
+            if (!limited_verbosity_) {
+                std::cout << "Exiting due to metrics plugin exception" << std::endl;
+            }
             break;
         }
 
         if (!run_logging()) {
-            std::cout << "Exiting due to logging exception" << std::endl;
+            if (!limited_verbosity_) {
+                std::cout << "Exiting due to logging exception" << std::endl;
+            }
             break;
         }
 
@@ -784,7 +804,6 @@ void SimControl::run() {
     } while (end_condition_interaction && !end_condition_reached(t(), dt_) && !exit_loop);
 
     cleanup();
-    return;
 }
 
 void SimControl::cleanup() {
@@ -1147,9 +1166,11 @@ void SimControl::worker() {
 }
 
 void print_err(PluginPtr p) {
-    std::cout << "failed to update entity " << p->parent()->id().id()
-        << ", plugin type \"" << p->type() << "\""
-        << ", plugin name \"" << p->name() << "\"" << std::endl;
+    if (p->print_err_on_exit) {
+        std::cout << "failed to update entity " << p->parent()->id().id()
+            << ", plugin type \"" << p->type() << "\""
+            << ", plugin name \"" << p->name() << "\"" << std::endl;
+    }
 }
 
 bool SimControl::run_entities() {
@@ -1380,5 +1401,9 @@ bool SimControl::output_summary() {
     }
 
     return true;
+}
+
+void SimControl::set_limited_verbosity(bool limited_verbosity) {
+    limited_verbosity_ = limited_verbosity;
 }
 } // namespace scrimmage

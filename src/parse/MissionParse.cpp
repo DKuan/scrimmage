@@ -834,3 +834,4 @@ void MissionParse::set_enable_gui(bool enable) {enable_gui_ = enable;}
 
 void MissionParse::set_time_warp(double warp) {time_warp_ = warp;}
 } // namespace scrimmage
+

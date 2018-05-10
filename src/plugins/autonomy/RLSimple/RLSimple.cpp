@@ -31,10 +31,13 @@
  */
 
 #include <scrimmage/math/State.h>
+#include <scrimmage/parse/ParseUtils.h>
 #include <scrimmage/plugin_manager/RegisterPlugin.h>
 #include <scrimmage/proto/ExternalControl.pb.h>
 
 #include <scrimmage/plugins/autonomy/RLSimple/RLSimple.h>
+
+#include <iostream>
 
 namespace sp = scrimmage_proto;
 namespace sc = scrimmage;
@@ -42,32 +45,73 @@ namespace sc = scrimmage;
 REGISTER_PLUGIN(scrimmage::Autonomy, RLSimple, RLSimple_plugin)
 
 void RLSimple::init(std::map<std::string, std::string> &params) {
-    output_vel_x_idx_ = vars_.declare(sc::VariableIO::Type::velocity_x, sc::VariableIO::Direction::Out);
-    output_vel_y_idx_ = vars_.declare(sc::VariableIO::Type::velocity_y, sc::VariableIO::Direction::Out);
-    output_vel_z_idx_ = vars_.declare(sc::VariableIO::Type::velocity_z, sc::VariableIO::Direction::Out);
+    x_discrete_ = sc::str2bool(params.at("x_discrete"));
+    y_discrete_ = sc::str2bool(params.at("y_discrete"));
+    ctrl_y_ = sc::str2bool(params.at("ctrl_y"));
+
+    using Type = sc::VariableIO::Type;
+    using Dir = sc::VariableIO::Direction;
+
+    output_vel_x_idx_ = vars_.declare(Type::velocity_x, Dir::Out);
+    output_vel_y_idx_ = vars_.declare(Type::velocity_y, Dir::Out);
+    uint8_t output_vel_z_idx = vars_.declare(Type::velocity_z, Dir::Out);
+
+    vars_.output(output_vel_x_idx_, 0);
+    vars_.output(output_vel_y_idx_, 0);
+    vars_.output(output_vel_z_idx, 0);
 
     radius_ = std::stod(params.at("radius"));
     ExternalControl::init(params);
 }
 
-std::pair<bool, double> RLSimple::calc_reward(double t) {
-    return {false, state_->pos().head<2>().norm() < radius_};
+std::pair<bool, double> RLSimple::calc_reward(double t, double dt) {
+    const bool done = false;
+    const bool reward = state_->pos()(0) < radius_;
+    return {done, reward};
 }
 
-bool RLSimple::handle_action(double t, double dt, const scrimmage_proto::Action &action) {
-    if (!check_action(action, 1, 0)) return false;
+double RLSimple::action_getter(bool discrete, int idx) {
+    if (discrete) {
+        return action_.discrete(idx) ? 1 : -1;
+    } else {
+        return action_.continuous(idx);
+    }
+}
 
-    double x_vel = action.discrete(0) == 1 ? 1 : -1;
+bool RLSimple::step_autonomy(double t, double dt) {
+    if (action_.done()) return false;
+
+    int num_discrete = x_discrete_ + (ctrl_y_ && y_discrete_);
+    int num_continuous = !x_discrete_ + (ctrl_y_ && !y_discrete_);
+
+    if (!check_action(action_, num_discrete, num_continuous)) return false;
+
+    double x_vel = action_getter(x_discrete_, 0);
+    double y_vel = ctrl_y_ ? action_getter(y_discrete_, 1) : 0;
+
     vars_.output(output_vel_x_idx_, x_vel);
+    vars_.output(output_vel_y_idx_, y_vel);
     return true;
 }
 
 scrimmage_proto::SpaceParams RLSimple::action_space_params() {
     sp::SpaceParams space_params;
-    sp::SingleSpaceParams *single_space_params = space_params.add_params();
-    single_space_params->set_discrete(true);
-    single_space_params->set_num_dims(1);
-    single_space_params->add_minimum(0);
-    single_space_params->add_maximum(1);
+
+    // y control
+    sp::SingleSpaceParams *x_ctrl_params = space_params.add_params();
+    x_ctrl_params->set_num_dims(1);
+    x_ctrl_params->set_discrete(x_discrete_);
+    x_ctrl_params->add_minimum(x_discrete_ ? 0 : -std::numeric_limits<double>::infinity());
+    x_ctrl_params->add_maximum(x_discrete_ ? 1 : std::numeric_limits<double>::infinity());
+
+    // y control
+    if (ctrl_y_) {
+        sp::SingleSpaceParams *y_ctrl_params = space_params.add_params();
+        y_ctrl_params->set_num_dims(1);
+        y_ctrl_params->set_discrete(y_discrete_);
+        y_ctrl_params->add_minimum(y_discrete_ ? 0 : -std::numeric_limits<double>::infinity());
+        y_ctrl_params->add_maximum(y_discrete_ ? 1 : std::numeric_limits<double>::infinity());
+    }
+
     return space_params;
 }

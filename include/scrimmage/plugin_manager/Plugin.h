@@ -131,6 +131,7 @@ class Plugin : public std::enable_shared_from_this<Plugin> {
     void set_time(std::shared_ptr<const Time> time) { time_ = time; }
 
     void draw_shape(scrimmage_proto::ShapePtr s);
+    bool print_err_on_exit = true;
 
  protected:
     std::string name_;
