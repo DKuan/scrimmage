@@ -66,7 +66,7 @@ void RLSimple::init(std::map<std::string, std::string> &params) {
 
 std::pair<bool, double> RLSimple::calc_reward(double t, double dt) {
     const bool done = false;
-    const bool reward = state_->pos()(0) < radius_;
+    const bool reward = std::abs(state_->pos()(0)) < radius_;
     return {done, reward};
 }
 

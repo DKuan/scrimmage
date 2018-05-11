@@ -32,7 +32,9 @@
   <show_origin>true</show_origin>
   <origin_length>10</origin_length>
 
-  <entity_interaction server_address="localhost:50051">ExternalControlInteraction</entity_interaction>
+  <entity_interaction
+    server_address="localhost:50051"
+    timeout="5">ExternalControlInteraction</entity_interaction>
 
   <seed>3361078855</seed>
 
@@ -41,23 +43,21 @@
       <health>1</health>
       <radius>1</radius>
 
+      <team_id>1</team_id>
+      <visual_model>Sphere</visual_model>
       <motion_model>SingleIntegrator</motion_model>
       <controller>SingleIntegratorControllerSimple</controller>
+      <sensor order="0">RLSimpleSensor</sensor>
+      <autonomy
+        discrete_x="true"
+        discrete_y="true"
+        ctrl_y="false">RLSimple</autonomy>
+      <y>0</y>
+      <z>0</z>
   </entity_common>
 
   <entity entity_common="all">
     <x>0</x>
-    <y>0</y>
-    <z>0</z>
-    <heading>0</heading>
-    <team_id>1</team_id>
-r   <color>77 77 255</color>
-    <autonomy
-      discrete_x="true"
-      discrete_y="true"
-      ctrl_y="false"
-      server_address="localhost:50051">RLSimple</autonomy>
-    <visual_model>Sphere</visual_model>
-    <sensor order="0">RLSimpleSensor</sensor>
+    <color>77 77 255</color>
   </entity>
 </runscript>

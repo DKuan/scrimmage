@@ -57,14 +57,12 @@ bool ExternalControlClient::send_environments(scrimmage_proto::Environments &env
 boost::optional<scrimmage_proto::Actions>
 ExternalControlClient::send_action_results(
         scrimmage_proto::ActionResults &action_results) {
-    // Connection timeout in seconds
-    unsigned int client_connection_timeout = 5;
-
     grpc::ClientContext context;
 
     // https://github.com/grpc/grpc/issues/3954
+    unsigned int milliseconds = 1000 * timeout_;
     std::chrono::system_clock::time_point deadline =
-        std::chrono::system_clock::now() + std::chrono::seconds(client_connection_timeout);
+        std::chrono::system_clock::now() + std::chrono::milliseconds(milliseconds);
 
     context.set_deadline(deadline);
 
@@ -76,6 +74,10 @@ ExternalControlClient::send_action_results(
     } else {
         return boost::optional<sp::Actions>(actions);
     }
+}
+
+void ExternalControlClient::set_timeout(double timeout) {
+    timeout_ = timeout;
 }
 } // namespace autonomy
 } // namespace scrimmage

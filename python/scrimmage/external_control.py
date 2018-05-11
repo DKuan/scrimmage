@@ -214,20 +214,24 @@ class ScrimmageEnv(gym.Env):
 
     def _start_scrimmage(self, enable_gui, disable_output):
 
+        def _update_node(base_node, tag, text):
+            node = base_node.find(tag)
+            if node is None:
+                base_node.append(ET.Element(tag))
+                node = base_node.find(tag)
+            node.text = text
+
         port = self.address.split(":")[1]
         tree = ET.parse(self.mission_file)
         root = tree.getroot()
 
         # set the seed using this class' random number generator
-        seed_node = root.find('seed')
-        if seed_node is None:
-            root.append(ET.Element("seed"))
-            seed_node = root.find('seed')
-        seed_node.text = str(self.rng.randint(0, 2**32 - 1))
+        _update_node(root, "seed", str(self.rng.randint(0, 2**32 - 1)))
 
         for nd in root.findall('entity_interaction'):
             if nd.text == 'ExternalControlInteraction':
                 nd.attrib['server_address'] = self.address
+                nd.attrib['timeout'] = str(self.timeout)
                 break
 
         # enable gui
@@ -238,11 +242,8 @@ class ScrimmageEnv(gym.Env):
 
         # disable output
         if disable_output:
-            output_node = root.find("output_type")
-            output_node.text = " "
-            display_progress_node = root.find("display_progress")
-            display_progress_node.text = "false"
-
+            _update_node(root, "output_type", " ")
+            _update_node(root, "display_progress", "false")
 
         self.temp_mission_file = \
             "." + port + platform.node() + os.path.basename(self.mission_file)
@@ -313,8 +314,13 @@ class ScrimmageEnv(gym.Env):
         sigint.
         """
         self.queues['action'].put(ExternalControl_pb2.Action(done=True))
+        if self.scrimmage_process is None:
+            return
+
         self.scrimmage_process.poll()
-        while self.scrimmage_process.returncode is None:
+        while (self.scrimmage_process is not None and
+               self.scrimmage_process.returncode is None):
+
             self.queues['action'].put(ExternalControl_pb2.Actions(done=True))
             time.sleep(0.1)
             self.scrimmage_process.poll()

@@ -64,6 +64,8 @@ bool ExternalControlInteraction::init(std::map<std::string, std::string> &missio
     *external_control_client_ =
         autonomy::ExternalControlClient(grpc::CreateChannel(
             server_address, grpc::InsecureChannelCredentials()));
+    external_control_client_->set_timeout(std::stod(plugin_params.at("timeout")));
+
     print_err_on_exit = false;
     return true;
 }

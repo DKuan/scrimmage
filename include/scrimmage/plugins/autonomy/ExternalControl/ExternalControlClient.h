@@ -58,9 +58,11 @@ class ExternalControlClient {
 
     boost::optional<scrimmage_proto::Actions>
     send_action_results(scrimmage_proto::ActionResults &action_results);
+    void set_timeout(double timeout);
 
  protected:
     std::unique_ptr<scrimmage_proto::ExternalControl::Stub> stub_;
+    double timeout_ = 60;
 };
 } // namespace autonomy
 } // namespace scrimmage
