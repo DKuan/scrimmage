@@ -4,4 +4,5 @@
   <library>ExternalControlInteraction_plugin</library>  
   <server_address>localhost:50051</server_address>
   <timeout>60</timeout>
+  <timestep>0</timestep>>
 </params>

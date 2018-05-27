@@ -41,12 +41,6 @@
 #include <limits>
 #include <utility>
 
-namespace scrimmage_proto {
-class Action;
-class SpaceParams;
-class ActionResult;
-}
-
 namespace scrimmage {
 
 namespace autonomy {
@@ -58,7 +52,7 @@ class ExternalControl : public scrimmage::Autonomy {
     bool step_autonomy(double t, double dt) override;
 
     // helper functions that do not get overridden
-    scrimmage_proto::ActionResult get_observation(double t);
+    void get_observation(double t, scrimmage_proto::SpaceSample *observation);
     void set_action(const scrimmage_proto::Action &action);
     scrimmage_proto::Environment get_env();
 

@@ -60,6 +60,7 @@ namespace interaction {
 bool ExternalControlInteraction::init(std::map<std::string, std::string> &mission_params,
                                       std::map<std::string, std::string> &plugin_params) {
     std::string server_address = plugin_params.at("server_address");
+    delayed_task_.delay = std::stod(plugin_params.at("timestep"));
     external_control_client_ = std::make_shared<autonomy::ExternalControlClient>();
     *external_control_client_ =
         autonomy::ExternalControlClient(grpc::CreateChannel(
@@ -81,6 +82,7 @@ bool ExternalControlInteraction::step_entity_interaction(
                 auto p = std::dynamic_pointer_cast<autonomy::ExternalControl>(a);
                 if (p) {
                     ext_ctrl_vec_.push_back(p);
+                    action_results_.add_action_results();
                 }
             }
         }
@@ -96,48 +98,67 @@ bool ExternalControlInteraction::step_entity_interaction(
 
     // get reward/obs/done
     // terminate is supposed to occur after the first state is experienced
-    sp::ActionResults action_results = get_action_result(t, dt);
-    auto actions = external_control_client_->send_action_results(action_results);
-
-    bool done;
-    if (actions && actions->actions_size() == static_cast<int>(ext_ctrl_vec_.size())) {
-        for (int i = 0; i < actions->actions_size(); i++) {
-            ext_ctrl_vec_[i]->set_action(actions->actions(i));
+    update_reward(t, dt);
+    if (!delayed_task_.update(t).first) {
+        if (action_results_.done()) {
+            external_control_client_->send_action_results(action_results_);
+            return false;
+        } else {
+            return true;
         }
-        done = false;
     } else {
-        sp::Action action;
-        action.set_done(true);
-        for (auto ext_ctrl : ext_ctrl_vec_) {
-            ext_ctrl->set_action(action);
-        }
-        done = true;
-    }
 
-    done |= action_results.done() || !actions || actions->done();
-    return !done;
+        update_observation(t);
+        auto actions = external_control_client_->send_action_results(action_results_);
+
+        bool done;
+        if (actions && actions->actions_size() == static_cast<int>(ext_ctrl_vec_.size())) {
+            for (int i = 0; i < actions->actions_size(); i++) {
+                ext_ctrl_vec_[i]->set_action(actions->actions(i));
+            }
+            done = false;
+        } else {
+            sp::Action action;
+            action.set_done(true);
+            for (auto ext_ctrl : ext_ctrl_vec_) {
+                ext_ctrl->set_action(action);
+            }
+            done = true;
+        }
+
+        done |= action_results_.done() || !actions || actions->done();
+
+        // reset action_results
+        for (size_t i = 0; i < ext_ctrl_vec_.size(); i++) {
+            action_results_.mutable_action_results(i)->set_reward(0);
+        }
+        return !done;
+    }
 }
 
-scrimmage_proto::ActionResults ExternalControlInteraction::get_action_result(
-        double t, double dt) {
+void ExternalControlInteraction::update_reward(double t, double dt) {
 
-    sp::ActionResults action_results;
     bool done = false;
 
-    for (auto &a : ext_ctrl_vec_) {
+    for (size_t i = 0; i < ext_ctrl_vec_.size(); i++) {
         double reward;
         bool temp_done;
-        std::tie(temp_done, reward) = a->calc_reward(t, dt);
+        std::tie(temp_done, reward) = ext_ctrl_vec_[i]->calc_reward(t, dt);
 
         done |= temp_done;
-        sp::ActionResult *ar = action_results.add_action_results();
-        *ar = a->get_observation(t);
+        auto *ar = action_results_.mutable_action_results(i);
         ar->set_done(temp_done);
-        ar->set_reward(reward);
+        ar->set_reward(ar->reward() + reward);
     }
 
-    action_results.set_done(done);
-    return action_results;
+    action_results_.set_done(done);
+}
+
+void ExternalControlInteraction::update_observation(double t) {
+    for (size_t i = 0; i < ext_ctrl_vec_.size(); i++) {
+        ext_ctrl_vec_[i]->get_observation(
+            t, action_results_.mutable_action_results(i)->mutable_observations());
+    }
 }
 
 bool ExternalControlInteraction::send_env() {
@@ -150,10 +171,9 @@ bool ExternalControlInteraction::send_env() {
 }
 
 void ExternalControlInteraction::close(double t) {
-    sp::ActionResults action_results = get_action_result(time_->t(), time_->dt());
-    action_results.set_done(true);
-    external_control_client_->send_action_results(action_results);
+    update_observation(t);
+    action_results_.set_done(true);
+    external_control_client_->send_action_results(action_results_);
 }
-
 } // namespace interaction
 } // namespace scrimmage

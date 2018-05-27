@@ -33,6 +33,7 @@
 #ifndef INCLUDE_SCRIMMAGE_PLUGINS_INTERACTION_EXTERNALCONTROLINTERACTION_EXTERNALCONTROLINTERACTION_H_
 #define INCLUDE_SCRIMMAGE_PLUGINS_INTERACTION_EXTERNALCONTROLINTERACTION_EXTERNALCONTROLINTERACTION_H_
 
+#include <scrimmage/common/DelayedTask.h>
 #include <scrimmage/simcontrol/EntityInteraction.h>
 
 #include <map>
@@ -66,12 +67,17 @@ class ExternalControlInteraction : public scrimmage::EntityInteraction {
  protected:
     bool send_env();
 
-    scrimmage_proto::ActionResults get_action_result(double t, double dt);
+    void update_reward(double t, double dt);
+    void update_observation(double t);
 
     bool env_sent_ = false;
 
     std::vector<autonomy::ExternalControlPtr> ext_ctrl_vec_;
     autonomy::ExternalControlClientPtr external_control_client_;
+
+    DelayedTask delayed_task_;
+
+    scrimmage_proto::ActionResults action_results_;
 };
 } // namespace interaction
 } // namespace scrimmage

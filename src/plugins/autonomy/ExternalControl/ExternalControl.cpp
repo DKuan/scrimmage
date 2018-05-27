@@ -66,21 +66,19 @@ std::pair<bool, double> ExternalControl::calc_reward(double t, double dt) {
     return {false, 0.0};
 }
 
-scrimmage_proto::ActionResult ExternalControl::get_observation(double t) {
-    sp::ActionResult action_result;
-    sp::SpaceSample *obs = action_result.mutable_observations();
+void ExternalControl::get_observation(
+        double t, scrimmage_proto::SpaceSample *observation) {
 
+    observation->clear_value();
     for (auto &kv : parent_->sensors()) {
         auto msg = kv.second->sensor_msg_flat(t);
         if (msg) {
             sp::SpaceSample &sample = msg->data;
             for (int i = 0; i < sample.value_size(); i++) {
-                obs->add_value(sample.value(i));
+                observation->add_value(sample.value(i));
             }
         }
     }
-
-    return action_result;
 }
 
 bool ExternalControl::check_action(
@@ -88,7 +86,6 @@ bool ExternalControl::check_action(
         uint64_t discrete_action_size,
         uint64_t continuous_action_size) {
     if (action.done()) {
-        std::cout << "received done signal from external controller" << std::endl;
         return false;
     } else if (static_cast<uint64_t>(action.discrete_size()) != discrete_action_size) {
         std::cout << "received discrete external action of length "

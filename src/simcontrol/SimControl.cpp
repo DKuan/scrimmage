@@ -97,7 +97,8 @@ SimControl::SimControl() :
     networks_(std::make_shared<std::map<std::string, NetworkPtr>>()),
     pubsub_(std::make_shared<PubSub>()),
     file_search_(std::make_shared<FileSearch>()),
-    sim_plugin_(std::make_shared<Plugin>()) {
+    sim_plugin_(std::make_shared<Plugin>()),
+    limited_verbosity_(false) {
 
     pause(false);
     prev_paused_ = false;

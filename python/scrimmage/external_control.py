@@ -284,16 +284,15 @@ class ScrimmageEnv(gym.Env):
         try:
             res.action_results
         except AttributeError:
-            print('returning error')
             return None, None, True, {}
 
         if self.num_actors == 1:
             obs = np.array(res.action_results[0].observations.value)
             rew = res.action_results[0].reward
-            done = res.action_results[0].done
+            done = res.done or res.action_results[0].done
         else:
             rew = [r.reward for r in res.action_results]
-            done = [r.done for r in res.action_results]
+            done = res.done or [r.done for r in res.action_results]
 
             if self.combine_actors:
                 obs = np.array([v for r in res.action_results
@@ -342,16 +341,10 @@ class ExternalControl(ExternalControl_pb2_grpc.ExternalControlServicer):
     def SendActionResults(self, action_results, context):
         """Receive ActionResult proto and send back an action."""
         self.queues['action_response'].put(action_results)
-        if not any([a.done for a in action_results.action_results]):
-            try:
-                action = self.queues['action'].get(timeout=self.timeout)
-            except queue.Empty:
-                action = ExternalControl_pb2.Action(done=True)
-                res = ExternalControl_pb2.ActionResult(done=True)
-        else:
+        try:
+            action = self.queues['action'].get(timeout=self.timeout)
+        except queue.Empty:
             action = ExternalControl_pb2.Action(done=True)
-            res = ExternalControl_pb2.ActionResult(done=True)
-            self.queues['action_response'].put(res)
         return action
 
 

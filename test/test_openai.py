@@ -32,6 +32,7 @@ A Long description goes here.
 
 import xml.etree.ElementTree as ET
 import copy
+import signal
 
 import numpy as np
 import gym
@@ -63,12 +64,15 @@ def _run_test(version, combine_actors, get_action):
     total_reward = 0
     for i in range(200):
         action = get_action(i)
-        temp_obs, reward = env.step(action)[:2]
+        temp_obs, reward, done = env.step(action)[:3]
         obs.append(temp_obs)
         try:
             total_reward += sum(reward)
         except TypeError:
             total_reward += reward
+
+        if done is True or (isinstance(done, list) and all(done)):
+            break
 
     env.close()
     print("Total Reward: %2.2f" % total_reward)
@@ -76,9 +80,13 @@ def _run_test(version, combine_actors, get_action):
     return env, obs, total_reward
 
 
-def _write_temp_mission(x_discrete, ctrl_y, y_discrete, num_actors):
+def _write_temp_mission(x_discrete, ctrl_y, y_discrete, num_actors, end):
     tree = ET.parse(scrimmage.find_mission(MISSION_FILE))
     root = tree.getroot()
+
+    run_node = root.find("run")
+    run_node.attrib['end'] = str(end)
+
     entity_common_node = root.find('entity_common')
     autonomy_node = entity_common_node.find('autonomy')
     autonomy_node.attrib['x_discrete'] = str(x_discrete)
@@ -92,14 +100,40 @@ def _write_temp_mission(x_discrete, ctrl_y, y_discrete, num_actors):
     tree.write(TEMP_MISSION_FILE)
 
 
+class TimeoutError(Exception):
+    """Implementation in case python 2 is used."""
+    pass
+
+
+class Timeout:
+    """Run an operation and raise TimeoutError if it takes too long.
+
+    see https://stackoverflow.com/a/22348885
+    """
+
+    def __init__(self, seconds=1, error_message='Timeout'):
+        self.seconds = seconds
+        self.error_message = error_message
+
+    def handle_timeout(self, signum, frame):
+        raise TimeoutError(self.error_message)
+
+    def __enter__(self):
+        signal.signal(signal.SIGALRM, self.handle_timeout)
+        signal.alarm(self.seconds)
+
+    def __exit__(self, type, value, traceback):
+        signal.alarm(0)
+
+
 def test_one_dim_discrete():
     """Open single entity scenario and make sure it banks."""
     def _get_action(i):
         return 1 if i < 100 else 0
 
     VERSION = 'scrimmage-v0'
-    _write_temp_mission(
-        x_discrete=True, ctrl_y=False, y_discrete=True, num_actors=1)
+    _write_temp_mission(x_discrete=True, ctrl_y=False, y_discrete=True,
+                        num_actors=1, end=1000)
     combine_actors = False
     env, obs, total_reward = _run_test(VERSION, combine_actors, _get_action)
 
@@ -117,8 +151,8 @@ def test_two_dim_discrete():
         return np.array([1, 1] if i < 100 else [0, 0], dtype=int)
 
     VERSION = 'scrimmage-v1'
-    _write_temp_mission(
-        x_discrete=True, ctrl_y=True, y_discrete=True, num_actors=1)
+    _write_temp_mission(x_discrete=True, ctrl_y=True, y_discrete=True,
+                        num_actors=1, end=1000)
     combine_actors = False
     env, obs, total_reward = _run_test(VERSION, combine_actors, _get_action)
 
@@ -136,8 +170,8 @@ def test_one_dim_continuous():
         return 1.0 if i < 100 else -1.0
 
     VERSION = 'scrimmage-v2'
-    _write_temp_mission(
-        x_discrete=False, ctrl_y=False, y_discrete=False, num_actors=1)
+    _write_temp_mission(x_discrete=False, ctrl_y=False, y_discrete=False,
+                        num_actors=1, end=1000)
     combine_actors = False
     env, obs, total_reward = _run_test(VERSION, combine_actors, _get_action)
 
@@ -154,8 +188,8 @@ def test_two_combined_veh_dim_discrete():
         return [1, 0] if i < 100 else [0, 1]
 
     VERSION = 'scrimmage-v3'
-    _write_temp_mission(
-        x_discrete=True, ctrl_y=False, y_discrete=False, num_actors=2)
+    _write_temp_mission(x_discrete=True, ctrl_y=False, y_discrete=False,
+                        num_actors=2, end=1000)
     combine_actors = True
     env, obs, total_reward = _run_test(VERSION, combine_actors, _get_action)
 
@@ -172,8 +206,8 @@ def test_two_not_combined_veh_dim_discrete():
         return [[1], [0]] if i < 100 else [[0], [1]]
 
     VERSION = 'scrimmage-v4'
-    _write_temp_mission(
-        x_discrete=True, ctrl_y=False, y_discrete=False, num_actors=2)
+    _write_temp_mission(x_discrete=True, ctrl_y=False, y_discrete=False,
+                        num_actors=2, end=1000)
     combine_actors = False
     env, obs, total_reward = _run_test(VERSION, combine_actors, _get_action)
 
@@ -185,9 +219,25 @@ def test_two_not_combined_veh_dim_discrete():
     assert total_reward == 8
 
 
+def test_sim_end():
+    """Verify that scrimmage can close an environment."""
+    def _get_action(i):
+        return 1 if i < 100 else 0
+
+    VERSION = 'scrimmage-v0'
+    _write_temp_mission(x_discrete=True, ctrl_y=False, y_discrete=True,
+                        num_actors=1, end=0.2)
+    combine_actors = False
+
+    # basically tests to make sure the simulation does not hang
+    with Timeout(seconds=10):
+        _run_test(VERSION, combine_actors, _get_action)
+
+
 if __name__ == '__main__':
     test_one_dim_discrete()
     test_two_dim_discrete()
     test_one_dim_continuous()
     test_two_combined_veh_dim_discrete()
     test_two_not_combined_veh_dim_discrete()
+    test_sim_end()
