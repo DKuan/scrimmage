@@ -73,7 +73,7 @@ class ScrimmageEnv(gym.Env):
 
     def __init__(self, enable_gui, mission_file,
                  combine_actors=True,
-                 num_actors=1, port_offset=1,
+                 port_offset=1,
                  address="localhost:50051",
                  timeout=600,
                  gdb_args=""):
@@ -85,7 +85,6 @@ class ScrimmageEnv(gym.Env):
         self.combine_actors = combine_actors
         self.address = address
         self.gdb_args = gdb_args
-        self.num_actors = num_actors
         self.timeout = timeout
         self.port_offset = port_offset
 

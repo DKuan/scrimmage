@@ -1,6 +1,6 @@
 <runscript name="Straight flying">
 
-  <run dt="0.1"
+  <run dt="1"
     end="100"
     enable_gui="false"
     network_gui="false"
@@ -13,7 +13,7 @@
 
   <end_condition>time</end_condition> 
 
-  <grid_spacing>10</grid_spacing>
+  <grid_spacing>1</grid_spacing>
   <grid_size>1000</grid_size>
 
   <background_color>191 191 191</background_color> 
@@ -29,8 +29,9 @@
   <latitude_origin>35.721025</latitude_origin>
   <longitude_origin>-120.767925</longitude_origin>
   <altitude_origin>300</altitude_origin>
-  <show_origin>true</show_origin>
+  <show_origin>false</show_origin>
   <origin_length>10</origin_length>
+  <camera focal_point="0,0,0" follow_id="4" mode="free" pos="0,0.01,50" show_fps="false" />
 
   <entity_interaction
     server_address="localhost:50051"

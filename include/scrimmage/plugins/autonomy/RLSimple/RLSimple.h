@@ -39,6 +39,8 @@
 #include <string>
 #include <utility>
 
+namespace scrimmage {
+namespace autonomy {
 class RLSimple : public scrimmage::autonomy::ExternalControl {
  public:
     void init(std::map<std::string, std::string> &params) override;
@@ -59,6 +61,10 @@ class RLSimple : public scrimmage::autonomy::ExternalControl {
 
     uint8_t output_vel_x_idx_ = 0;
     uint8_t output_vel_y_idx_ = 0;
+
+    std::string reward_type_;
 };
+} // namespace autonomy
+} // namespace scrimmage
 
 #endif // INCLUDE_SCRIMMAGE_PLUGINS_AUTONOMY_RLSIMPLE_RLSIMPLE_H_

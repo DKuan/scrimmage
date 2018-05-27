@@ -30,6 +30,7 @@
  *
  */
 
+#include <scrimmage/entity/Contact.h>
 #include <scrimmage/math/State.h>
 #include <scrimmage/parse/ParseUtils.h>
 #include <scrimmage/plugin_manager/RegisterPlugin.h>
@@ -39,18 +40,24 @@
 
 #include <iostream>
 
-namespace sp = scrimmage_proto;
-namespace sc = scrimmage;
+#include <boost/range/algorithm/count_if.hpp>
 
-REGISTER_PLUGIN(scrimmage::Autonomy, RLSimple, RLSimple_plugin)
+namespace sp = scrimmage_proto;
+namespace br = boost::range;
+
+REGISTER_PLUGIN(scrimmage::Autonomy, scrimmage::autonomy::RLSimple, RLSimple_plugin)
+
+namespace scrimmage {
+namespace autonomy {
 
 void RLSimple::init(std::map<std::string, std::string> &params) {
-    x_discrete_ = sc::str2bool(params.at("x_discrete"));
-    y_discrete_ = sc::str2bool(params.at("y_discrete"));
-    ctrl_y_ = sc::str2bool(params.at("ctrl_y"));
+    x_discrete_ = str2bool(params.at("x_discrete"));
+    y_discrete_ = str2bool(params.at("y_discrete"));
+    ctrl_y_ = str2bool(params.at("ctrl_y"));
+    reward_type_ = params.at("reward_type");
 
-    using Type = sc::VariableIO::Type;
-    using Dir = sc::VariableIO::Direction;
+    using Type = VariableIO::Type;
+    using Dir = VariableIO::Direction;
 
     output_vel_x_idx_ = vars_.declare(Type::velocity_x, Dir::Out);
     output_vel_y_idx_ = vars_.declare(Type::velocity_y, Dir::Out);
@@ -61,12 +68,26 @@ void RLSimple::init(std::map<std::string, std::string> &params) {
     vars_.output(output_vel_z_idx, 0);
 
     radius_ = std::stod(params.at("radius"));
+
+    // start at an integer
+    for (int i = 0; i < 3; i++) {
+        state_->pos()(i) = std::round(state_->pos()(i));
+    }
+
     ExternalControl::init(params);
 }
 
 std::pair<bool, double> RLSimple::calc_reward(double t, double dt) {
     const bool done = false;
-    const bool reward = std::abs(state_->pos()(0)) < radius_;
+    double reward = 0;
+    double x = state_->pos()(0);
+    if (reward_type_ == "origin") {
+        reward = static_cast<double>(std::abs(x) < radius_);
+    } else if (reward_type_ == "consensus") {
+        auto close = [&](auto &kv){return std::abs(kv.second.state()->pos()(0) - x) < radius_;};
+        reward = br::count_if(*contacts_, close);
+    }
+
     return {done, reward};
 }
 
@@ -97,7 +118,7 @@ bool RLSimple::step_autonomy(double t, double dt) {
 scrimmage_proto::SpaceParams RLSimple::action_space_params() {
     sp::SpaceParams space_params;
 
-    // y control
+    // x control
     sp::SingleSpaceParams *x_ctrl_params = space_params.add_params();
     x_ctrl_params->set_num_dims(1);
     x_ctrl_params->set_discrete(x_discrete_);
@@ -115,3 +136,6 @@ scrimmage_proto::SpaceParams RLSimple::action_space_params() {
 
     return space_params;
 }
+
+} // namespace autonomy
+} // namespace scrimmage

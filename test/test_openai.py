@@ -142,7 +142,7 @@ def test_one_dim_discrete():
     assert isinstance(env.action_space, gym.spaces.Discrete)
     assert isinstance(env.observation_space, gym.spaces.Box)
     assert env.action_space.n == 2
-    assert total_reward == 4
+    assert total_reward == 5
 
 
 def test_two_dim_discrete():
@@ -161,7 +161,7 @@ def test_two_dim_discrete():
     assert isinstance(env.action_space, gym.spaces.MultiDiscrete)
     assert isinstance(env.observation_space, gym.spaces.Box)
     assert np.array_equal(env.action_space.nvec, np.array([2, 2], dtype=int))
-    assert total_reward == 4
+    assert total_reward == 5
 
 
 def test_one_dim_continuous():
@@ -179,7 +179,7 @@ def test_one_dim_continuous():
     assert obs[0] == 0
     assert isinstance(env.action_space, gym.spaces.Box)
     assert isinstance(env.observation_space, gym.spaces.Box)
-    assert total_reward == 4
+    assert total_reward == 5
 
 
 def test_two_combined_veh_dim_discrete():
@@ -197,7 +197,7 @@ def test_two_combined_veh_dim_discrete():
     assert np.array_equal(obs[0], np.array([0., 0.]))
     assert isinstance(env.action_space, gym.spaces.MultiDiscrete)
     assert isinstance(env.observation_space, gym.spaces.Box)
-    assert total_reward == 8
+    assert total_reward == 10
 
 
 def test_two_not_combined_veh_dim_discrete():
@@ -216,7 +216,7 @@ def test_two_not_combined_veh_dim_discrete():
     assert obs[0][1] == 0
     assert isinstance(env.action_space, gym.spaces.Tuple)
     assert isinstance(env.observation_space, gym.spaces.Tuple)
-    assert total_reward == 8
+    assert total_reward == 10
 
 
 def test_sim_end():
