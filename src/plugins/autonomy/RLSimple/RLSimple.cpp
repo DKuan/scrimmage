@@ -54,7 +54,6 @@ void RLSimple::init(std::map<std::string, std::string> &params) {
     x_discrete_ = str2bool(params.at("x_discrete"));
     y_discrete_ = str2bool(params.at("y_discrete"));
     ctrl_y_ = str2bool(params.at("ctrl_y"));
-    reward_type_ = params.at("reward_type");
 
     using Type = VariableIO::Type;
     using Dir = VariableIO::Direction;
@@ -69,25 +68,14 @@ void RLSimple::init(std::map<std::string, std::string> &params) {
 
     radius_ = std::stod(params.at("radius"));
 
-    // start at an integer
-    for (int i = 0; i < 3; i++) {
-        state_->pos()(i) = std::round(state_->pos()(i));
-    }
-
     ExternalControl::init(params);
 }
 
 std::pair<bool, double> RLSimple::calc_reward(double t, double dt) {
     const bool done = false;
-    double reward = 0;
-    double x = state_->pos()(0);
-    if (reward_type_ == "origin") {
-        reward = static_cast<double>(std::abs(x) < radius_);
-    } else if (reward_type_ == "consensus") {
-        auto close = [&](auto &kv){return std::abs(kv.second.state()->pos()(0) - x) < radius_;};
-        reward = br::count_if(*contacts_, close);
-    }
-
+    const double x = state_->pos()(0);
+    const bool within_radius = std::round(std::abs(x)) < radius_;
+    double reward = within_radius ? 1 : 0;
     return {done, reward};
 }
 
@@ -99,7 +87,7 @@ double RLSimple::action_getter(bool discrete, int idx) {
     }
 }
 
-bool RLSimple::step_autonomy(double t, double dt) {
+bool RLSimple::step_autonomy(double /*t*/, double /*dt*/) {
     if (action_.done()) return false;
 
     int num_discrete = x_discrete_ + (ctrl_y_ && y_discrete_);

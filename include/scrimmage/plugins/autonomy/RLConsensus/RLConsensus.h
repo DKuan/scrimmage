@@ -30,10 +30,10 @@
  *
  */
 
-#ifndef INCLUDE_SCRIMMAGE_PLUGINS_AUTONOMY_RLSIMPLE_RLSIMPLE_H_
-#define INCLUDE_SCRIMMAGE_PLUGINS_AUTONOMY_RLSIMPLE_RLSIMPLE_H_
+#ifndef INCLUDE_SCRIMMAGE_PLUGINS_AUTONOMY_RLCONSENSUS_RLCONSENSUS_H_
+#define INCLUDE_SCRIMMAGE_PLUGINS_AUTONOMY_RLCONSENSUS_RLCONSENSUS_H_
 
-#include <scrimmage/plugins/autonomy/ExternalControl/ExternalControl.h>
+#include <scrimmage/plugins/autonomy/RLSimple/RLSimple.h>
 
 #include <map>
 #include <string>
@@ -42,28 +42,12 @@
 namespace scrimmage {
 namespace autonomy {
 
-class RLSimple : public scrimmage::autonomy::ExternalControl {
+class RLConsensus : public scrimmage::autonomy::RLSimple {
  public:
     void init(std::map<std::string, std::string> &params) override;
-    bool step_autonomy(double t, double dt) override;
-
     std::pair<bool, double> calc_reward(double t, double dt) override;
-
- protected:
-    scrimmage_proto::SpaceParams action_space_params() override;
-    double action_getter(bool discrete, int idx);
-
-    double radius_;
-
-    bool x_discrete_ = true;
-
-    bool ctrl_y_ = false;
-    bool y_discrete_ = true;
-
-    uint8_t output_vel_x_idx_ = 0;
-    uint8_t output_vel_y_idx_ = 0;
 };
 } // namespace autonomy
 } // namespace scrimmage
 
-#endif // INCLUDE_SCRIMMAGE_PLUGINS_AUTONOMY_RLSIMPLE_RLSIMPLE_H_
+#endif // INCLUDE_SCRIMMAGE_PLUGINS_AUTONOMY_RLCONSENSUS_RLCONSENSUS_H_

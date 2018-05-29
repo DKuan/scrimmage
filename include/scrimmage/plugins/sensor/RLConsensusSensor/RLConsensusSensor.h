@@ -30,40 +30,29 @@
  *
  */
 
-#ifndef INCLUDE_SCRIMMAGE_PLUGINS_AUTONOMY_RLSIMPLE_RLSIMPLE_H_
-#define INCLUDE_SCRIMMAGE_PLUGINS_AUTONOMY_RLSIMPLE_RLSIMPLE_H_
+#ifndef INCLUDE_SCRIMMAGE_PLUGINS_SENSOR_RLCONSENSUSSENSOR_RLCONSENSUSSENSOR_H_
+#define INCLUDE_SCRIMMAGE_PLUGINS_SENSOR_RLCONSENSUSSENSOR_RLCONSENSUSSENSOR_H_
 
-#include <scrimmage/plugins/autonomy/ExternalControl/ExternalControl.h>
+#include <scrimmage/sensor/Sensor.h>
 
 #include <map>
 #include <string>
-#include <utility>
+#include <vector>
+
+namespace scrimmage_proto {
+class SpaceParams;
+class SpaceSample;
+}
 
 namespace scrimmage {
-namespace autonomy {
-
-class RLSimple : public scrimmage::autonomy::ExternalControl {
+namespace sensor {
+class RLConsensusSensor : public scrimmage::Sensor {
  public:
     void init(std::map<std::string, std::string> &params) override;
-    bool step_autonomy(double t, double dt) override;
-
-    std::pair<bool, double> calc_reward(double t, double dt) override;
-
- protected:
-    scrimmage_proto::SpaceParams action_space_params() override;
-    double action_getter(bool discrete, int idx);
-
-    double radius_;
-
-    bool x_discrete_ = true;
-
-    bool ctrl_y_ = false;
-    bool y_discrete_ = true;
-
-    uint8_t output_vel_x_idx_ = 0;
-    uint8_t output_vel_y_idx_ = 0;
+    scrimmage_proto::SpaceParams observation_space_params() override;
+    scrimmage::MessagePtr<scrimmage_proto::SpaceSample> sensor_msg_flat(double t) override;
 };
-} // namespace autonomy
+} // namespace sensor
 } // namespace scrimmage
 
-#endif // INCLUDE_SCRIMMAGE_PLUGINS_AUTONOMY_RLSIMPLE_RLSIMPLE_H_
+#endif // INCLUDE_SCRIMMAGE_PLUGINS_SENSOR_RLCONSENSUSSENSOR_RLCONSENSUSSENSOR_H_

@@ -30,7 +30,7 @@
  *
  */
 
-#include <scrimmage/plugins/sensor/RLSimpleSensor/RLSimpleSensor.h>
+#include <scrimmage/plugins/sensor/RLConsensusSensor/RLConsensusSensor.h>
 
 #include <scrimmage/entity/Entity.h>
 #include <scrimmage/math/State.h>
@@ -46,27 +46,36 @@ namespace sc = scrimmage;
 namespace sp = scrimmage_proto;
 namespace ba = boost::adaptors;
 
-REGISTER_PLUGIN(scrimmage::Sensor, scrimmage::sensor::RLSimpleSensor, RLSimpleSensor_plugin)
+REGISTER_PLUGIN(scrimmage::Sensor, scrimmage::sensor::RLConsensusSensor, RLConsensusSensor_plugin)
 
 namespace scrimmage {
 namespace sensor {
 
+void RLConsensusSensor::init(std::map<std::string, std::string> &/*params*/) {}
+
 scrimmage::MessagePtr<scrimmage_proto::SpaceSample>
-RLSimpleSensor::sensor_msg_flat(double /*t*/) {
+RLConsensusSensor::sensor_msg_flat(double /*t*/) {
     auto msg = std::make_shared<sc::Message<sp::SpaceSample>>();
-    msg->data.add_value(parent_->state()->pos()(0));
+
+    // order contacts
+    auto ids_view = *parent_->contacts() | ba::map_keys;
+    std::set<int> ids(ids_view.begin(), ids_view.end());
+
+    msg->data.add_value(parent_->id().id() - 1);
+    for (int id : ids) {
+        msg->data.add_value(parent_->contacts()->at(id).state()->pos()(0));
+    }
     return msg;
 }
 
-scrimmage_proto::SpaceParams RLSimpleSensor::observation_space_params() {
-    std::cout << "RLSimpleSensor observation_space_params" << std::endl;
+scrimmage_proto::SpaceParams RLConsensusSensor::observation_space_params() {
     sp::SpaceParams space_params;
 
     const int num_neigh = parent_->contacts()->size();
     const double inf = std::numeric_limits<double>::infinity();
 
     sp::SingleSpaceParams *single_space_params = space_params.add_params();
-    single_space_params->set_num_dims(num_neigh);
+    single_space_params->set_num_dims(1 + num_neigh);
     single_space_params->add_minimum(-inf);
     single_space_params->add_maximum(inf);
     single_space_params->set_discrete(false);

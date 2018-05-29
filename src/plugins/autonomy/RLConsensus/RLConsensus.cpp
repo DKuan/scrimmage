@@ -30,49 +30,42 @@
  *
  */
 
-#include <scrimmage/plugins/sensor/RLSimpleSensor/RLSimpleSensor.h>
-
-#include <scrimmage/entity/Entity.h>
+#include <scrimmage/entity/Contact.h>
 #include <scrimmage/math/State.h>
 #include <scrimmage/parse/ParseUtils.h>
 #include <scrimmage/plugin_manager/RegisterPlugin.h>
 #include <scrimmage/proto/ExternalControl.pb.h>
 
+#include <scrimmage/plugins/autonomy/RLConsensus/RLConsensus.h>
+
 #include <iostream>
 
-#include <boost/range/adaptor/map.hpp>
+#include <boost/range/algorithm/count_if.hpp>
 
-namespace sc = scrimmage;
 namespace sp = scrimmage_proto;
-namespace ba = boost::adaptors;
+namespace br = boost::range;
 
-REGISTER_PLUGIN(scrimmage::Sensor, scrimmage::sensor::RLSimpleSensor, RLSimpleSensor_plugin)
+REGISTER_PLUGIN(scrimmage::Autonomy, scrimmage::autonomy::RLConsensus, RLConsensus_plugin)
 
 namespace scrimmage {
-namespace sensor {
+namespace autonomy {
 
-scrimmage::MessagePtr<scrimmage_proto::SpaceSample>
-RLSimpleSensor::sensor_msg_flat(double /*t*/) {
-    auto msg = std::make_shared<sc::Message<sp::SpaceSample>>();
-    msg->data.add_value(parent_->state()->pos()(0));
-    return msg;
+void RLConsensus::init(std::map<std::string, std::string> &params) {
+    RLSimple::init(params);
 }
 
-scrimmage_proto::SpaceParams RLSimpleSensor::observation_space_params() {
-    std::cout << "RLSimpleSensor observation_space_params" << std::endl;
-    sp::SpaceParams space_params;
+std::pair<bool, double> RLConsensus::calc_reward(double /*t*/, double /*dt*/) {
+    const bool done = false;
+    double reward = 0;
+    double x = state_->pos()(0);
+    // auto close = [&](auto &kv) {
+    //     return std::round(std::abs(kv.second.state()->pos()(0) - x)) < radius_;
+    // };
+    // reward = (br::count_if(*contacts_, close) - 1) / 100.0;
 
-    const int num_neigh = parent_->contacts()->size();
-    const double inf = std::numeric_limits<double>::infinity();
-
-    sp::SingleSpaceParams *single_space_params = space_params.add_params();
-    single_space_params->set_num_dims(num_neigh);
-    single_space_params->add_minimum(-inf);
-    single_space_params->add_maximum(inf);
-    single_space_params->set_discrete(false);
-
-    return space_params;
+    reward = static_cast<double>(std::abs(x) < radius_) / 100.0;
+    return {done, reward};
 }
 
-} // namespace sensor
+} // namespace autonomy
 } // namespace scrimmage

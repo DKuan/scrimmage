@@ -76,11 +76,13 @@ class ScrimmageEnv(gym.Env):
                  port_offset=1,
                  address="localhost:50051",
                  timeout=600,
+                 global_sensor=False,
                  gdb_args=""):
         """Create queues for multi-threading."""
         signal.signal(signal.SIGINT, self._signal_handler)
 
         self.enable_gui = enable_gui
+        self.global_sensor = global_sensor
         self.mission_file = mission_file
         self.combine_actors = combine_actors
         self.address = address
@@ -117,11 +119,12 @@ class ScrimmageEnv(gym.Env):
         else:
             if self.combine_actors:
                 self._env = ExternalControl_pb2.Environment()
-                for e in envs.envs:
+                for i, e in enumerate(envs.envs):
                     for p in e.action_spaces.params:
                         self._env.action_spaces.params.extend([p])
-                    for p in e.observation_spaces.params:
-                        self._env.observation_spaces.params.extend([p])
+                    if not self.global_sensor or i == 0:
+                        for p in e.observation_spaces.params:
+                            self._env.observation_spaces.params.extend([p])
                 self.reward_range = \
                     (sum([e.min_reward for e in envs.envs]),
                      sum([e.max_reward for e in envs.envs]))
@@ -290,19 +293,24 @@ class ScrimmageEnv(gym.Env):
             rew = res.action_results[0].reward
             done = res.done or res.action_results[0].done
         else:
-            rew = [r.reward for r in res.action_results]
-            done = res.done or [r.done for r in res.action_results]
+            info['rewards'] = [r.reward for r in res.action_results]
+            rew = sum(info['rewards'])
+
+            info['done'] = [r.done for r in res.action_results]
+            done = res.done or any(info['done'])
 
             if self.combine_actors:
-                obs = np.array([v for r in res.action_results
-                                for v in r.observations.value])
-                rew = sum(rew)
-                done = any(done)
+                if self.global_sensor:
+                    obs = np.array(
+                        [v for v in res.action_results[0].observations.value])
+                else:
+                    obs = np.array([v for r in res.action_results
+                                    for v in r.observations.value])
             else:
                 obs = [np.array(r.observations.value)
                        for r in res.action_results]
 
-        return obs, rew, done, {}
+        return obs, rew, done, info
 
     def _terminate_scrimmage(self):
         """Terminates scrimmage instance held by the class.

@@ -44,10 +44,16 @@ class SpaceParams;
 class SpaceSample;
 }
 
+namespace scrimmage {
+namespace sensor {
+
 class RLSimpleSensor : public scrimmage::Sensor {
  public:
     scrimmage_proto::SpaceParams observation_space_params() override;
     scrimmage::MessagePtr<scrimmage_proto::SpaceSample> sensor_msg_flat(double t) override;
 };
+
+} // namespace sensor
+} // namespace scrimmage
 
 #endif // INCLUDE_SCRIMMAGE_PLUGINS_SENSOR_RLSIMPLESENSOR_RLSIMPLESENSOR_H_
