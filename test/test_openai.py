@@ -63,7 +63,7 @@ def _run_test(version, combine_actors, get_action):
 
     obs.append(env.reset())
     total_reward = 0
-    for i in range(200):
+    for i in range(1000):
         action = get_action(i)
         temp_obs, reward, done = env.step(action)[:3]
         obs.append(temp_obs)
@@ -237,8 +237,8 @@ def test_sim_end():
 
 if __name__ == '__main__':
     test_one_dim_discrete()
-    test_two_dim_discrete()
-    test_one_dim_continuous()
-    test_two_combined_veh_dim_discrete()
-    test_two_not_combined_veh_dim_discrete()
-    test_sim_end()
+    # test_two_dim_discrete()
+    # test_one_dim_continuous()
+    # test_two_combined_veh_dim_discrete()
+    # test_two_not_combined_veh_dim_discrete()
+    # test_sim_end()

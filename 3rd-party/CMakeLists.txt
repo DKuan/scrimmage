@@ -81,7 +81,7 @@ ExternalProject_Add (
 # Download and build protobuf
 ########################################################
 set(PROTOBUF_CMAKE_MODULE_DIR ${CMAKE_INSTALL_PREFIX}/share/cmake/protobuf/)
-set(PROTOBUF_VERSION_NUM 3.3.0)
+set(PROTOBUF_VERSION_NUM 3.5.2)
 set(PROTOBUF_VERSION v${PROTOBUF_VERSION_NUM})
 set(PROTOBUF_GIT_REPOSITORY "https://github.com/google/protobuf.git")
 ExternalProject_Add (
@@ -100,7 +100,7 @@ ExternalProject_Add (
 # Download and build grpc
 ########################################################
 configure_file(${PATCH_DIR}/grpc.patch.in ${PATCH_DIR}/grpc.patch)
-set(GRPC_VERSION_NUM 1.2.1)
+set(GRPC_VERSION_NUM 1.12.0)
 set(GRPC_VERSION v${GRPC_VERSION_NUM})
 set(GRPC_GIT_REPOSITORY https://github.com/grpc/grpc)
 ExternalProject_Add (

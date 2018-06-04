@@ -38,8 +38,6 @@
 #include <scrimmage/plugin_manager/RegisterPlugin.h>
 #include <scrimmage/proto/ExternalControl.pb.h>
 
-#include <iostream>
-
 #include <boost/range/adaptor/map.hpp>
 
 namespace sc = scrimmage;
@@ -59,7 +57,6 @@ RLSimpleSensor::sensor_msg_flat(double /*t*/) {
 }
 
 scrimmage_proto::SpaceParams RLSimpleSensor::observation_space_params() {
-    std::cout << "RLSimpleSensor observation_space_params" << std::endl;
     sp::SpaceParams space_params;
 
     const int num_neigh = parent_->contacts()->size();

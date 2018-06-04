@@ -258,6 +258,7 @@ class ScrimmageEnv(gym.Env):
         else:
             cmd = ["scrimmage", self.temp_mission_file]
         cmd = ["scrimmage", self.temp_mission_file]
+        cmd = ["valgrind", "--tool=callgrind", "scrimmage", self.temp_mission_file]
         # cmd = ['gdb', '-x', '~/scrimmage/.gdbinit', '-f', 'scrimmage']
         # print(cmd)
         return subprocess.Popen(cmd)
