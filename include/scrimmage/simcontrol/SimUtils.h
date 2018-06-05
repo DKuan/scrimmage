@@ -35,6 +35,9 @@
 
 #include <scrimmage/fwd_decl.h>
 
+#include <scrimmage/simcontrol/SimControl.h>
+
+#include <functional>
 #include <memory>
 #include <unordered_map>
 #include <list>
@@ -71,6 +74,15 @@ void print_io_error(const std::string &in_name, VariableIO &v);
 bool verify_io_connection(VariableIO &output_plugin, VariableIO &input_plugin);
 
 boost::optional<std::string> run_test(std::string mission);
+
+boost::optional<std::string> run_scrimmage(
+        SimControl &simcontrol,
+        const std::string &mission_file,
+        std::function<void(MissionParsePtr&, InterfacePtr&, InterfacePtr&)> viewer_callback = nullptr,
+        double time_warp = -1,
+        int task_id = -1,
+        int job_id = -1,
+        int seed = -1);
 
 bool check_output(std::string output_type, std::string desired_output);
 

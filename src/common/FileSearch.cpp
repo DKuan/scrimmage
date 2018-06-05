@@ -61,7 +61,7 @@ boost::optional<std::string> FileSearch::find_mission(std::string mission,
 
     std::string out;
     auto search = [&](auto env) {return this->find_file(
-            mission, "xml", env, out);};
+            mission, "xml", env, out, verbose);};
     std::list<std::string> env_vars
         {"SCRIMMAGE_MISSION_PATH",
             "/usr/share/scrimmage",

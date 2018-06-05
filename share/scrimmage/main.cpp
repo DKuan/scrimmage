@@ -62,6 +62,8 @@
 #include <Python.h>
 #endif
 
+#include <boost/optional.hpp>
+
 using std::cout;
 using std::endl;
 
@@ -122,136 +124,27 @@ int main(int argc, char *argv[]) {
         return -1;
     }
 
-    // Parse mission config file:
-    sc::MissionParsePtr mp = std::make_shared<sc::MissionParse>();
+    std::string mission_file = argv[optind];
+    int seed_int = seed_set ? std::stoi(seed) : -1;
+    int disable_gui = false;
 
-    // If the task_num was defined, tell the mission parser, so it can be
-    // stored in the directory log name
-    if (task_id != -1) {
-        mp->set_task_number(task_id);
-    }
-    if (job_id != -1) {
-        mp->set_job_number(job_id);
-    }
-    if (!mp->parse(argv[optind])) {
-        cout << "Failed to parse file: " << argv[optind] << endl;
-        return -1;
-    }
-
-    std::string output_type = sc::get("output_type", mp->params(), std::string("frames"));
-    bool output_all = output_type.find("all") != std::string::npos;
-    auto should_log = [&](std::string s) {
-        return output_all || output_type.find(s) != std::string::npos;
-    };
-
-    bool output_frames = should_log("frames");
-    bool output_summary = should_log("summary");
-    bool output_git = should_log("git_commits");
-    bool output_mission = should_log("mission");
-    bool output_seed = should_log("seed");
-    bool output_nothing =
-        !output_all && !output_frames && !output_summary &&
-        !output_git && !output_mission && !output_seed;
-
-    simcontrol.set_limited_verbosity(output_nothing);
-
-    if (!output_nothing) {
-        mp->create_log_dir();
-    }
-
-    auto log = sc::setup_logging(mp);
-
-    // Overwrite the seed if it's set
-    if (seed_set) {
-        mp->params()["seed"] = seed;
-    }
-    simcontrol.set_log(log);
-
-    sc::InterfacePtr to_gui_interface = std::make_shared<sc::Interface>();
-    sc::InterfacePtr from_gui_interface = std::make_shared<sc::Interface>();
-    to_gui_interface->set_log(log);
-    from_gui_interface->set_log(log);
-
-    simcontrol.set_incoming_interface(from_gui_interface);
-    simcontrol.set_outgoing_interface(to_gui_interface);
-
-    // Split off SimControl in it's own thread
-#if ENABLE_PYTHON_BINDINGS == 1
-    Py_Initialize();
-#endif
-    simcontrol.set_mission_parse(mp);
-    if (!simcontrol.init()) {
-        cout << "SimControl init() failed." << endl;
-        return -1;
-    }
-
-    bool display_progress = sc::get("display_progress", mp->params(), true);
-    simcontrol.display_progress(display_progress);
-
-#if ENABLE_VIEWER == 0
-    simcontrol.pause(false);
-    simcontrol.run();
-#else
-    if (simcontrol.enable_gui()) {
-        simcontrol.start();
+    auto viewer_callback = [](sc::MissionParsePtr &mp, sc::InterfacePtr &to_gui_interface, sc::InterfacePtr &from_gui_interface) {
         scrimmage::Viewer viewer;
         viewer.set_incoming_interface(to_gui_interface);
         viewer.set_outgoing_interface(from_gui_interface);
         viewer.set_enable_network(false);
         viewer.init(mp->attributes()["camera"], mp->log_dir(), mp->dt());
         viewer.run();
+    };
 
-        // When the viewer finishes, tell simcontrol to exit
-        simcontrol.force_exit();
-        simcontrol.join();
+    const double time_warp = -1;
+    auto log = sc::run_scrimmage(
+        simcontrol, mission_file, viewer_callback, time_warp, task_id, job_id, seed_int);
+
+    if (log) {
+        return 0;
     } else {
-        simcontrol.pause(false);
-        simcontrol.run();
+        return -1;
     }
-#endif
-
-#if ENABLE_PYTHON_BINDINGS == 1
-    Py_Finalize();
-#endif
-    simcontrol.output_runtime();
-
-    // summary
-    if (output_summary && !simcontrol.output_summary()) return -1;
-
-    if (output_git) {
-        std::map<std::string, std::unordered_set<std::string>> commits =
-            simcontrol.plugin_manager()->get_commits();
-        std::string scrimmage_version = sc::get_version();
-
-        if (scrimmage_version != "") {
-            commits[scrimmage_version].insert("scrimmage");
-        }
-
-        for (auto &kv : commits) {
-            std::string output = kv.first + ":";
-            for (const std::string &plugin_name : kv.second) {
-                output += plugin_name + ",";
-            }
-            output.pop_back();
-            log->write_ascii(output);
-        }
-    }
-
-    if (sc::get("plot_tracks", mp->params(), false)) {
-        std::string plot_cmd = "plot_3d_fr.py " + log->frames_filename();
-        int result = std::system(plot_cmd.c_str());
-        if (result != 0) {
-            cout << "plot_tracks failed with return code: "
-                 << result << endl;
-        }
-    }
-
-    // Close the log file
-    log->close_log();
-
-    if (!output_nothing) {
-        cout << "Simulation Complete" << endl;
-    }
-    return 0;
 }
 

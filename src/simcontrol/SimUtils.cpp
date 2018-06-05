@@ -31,6 +31,7 @@
  */
 
 #include <scrimmage/common/FileSearch.h>
+#include <scrimmage/common/Utilities.h>
 #include <scrimmage/entity/Entity.h>
 #include <scrimmage/log/Log.h>
 #include <scrimmage/metrics/Metrics.h>
@@ -186,50 +187,165 @@ void print_io_error(const std::string &in_name, VariableIO &v) {
     }
 }
 
+namespace {
+// https://stackoverflow.com/a/48164204 
+std::function<void(int)> shutdown_handler;
+void signal_handler(int signal) { shutdown_handler(signal); }
+} // namespace
+
 boost::optional<std::string> run_test(std::string mission) {
+
     auto found_mission = FileSearch().find_mission(mission);
     if (!found_mission) {
         std::cout << "scrimmage::run_test could not find " << mission << std::endl;
         return boost::none;
+    } else {
+        SimControl simcontrol;
+
+        // Handle kill signals
+        struct sigaction sa;
+        memset( &sa, 0, sizeof(sa) );
+        shutdown_handler = [&](int s){
+            std::cout << std::endl << "Exiting gracefully" << std::endl;
+            simcontrol.force_exit();
+        };
+        sa.sa_handler = signal_handler;
+        sigfillset(&sa.sa_mask);
+        sigaction(SIGINT, &sa, NULL);
+        sigaction(SIGTERM, &sa, NULL);
+
+        const double time_warp = 0;
+        return run_scrimmage(simcontrol, *found_mission, nullptr, time_warp);
     }
+}
+
+boost::optional<std::string> run_scrimmage(
+        SimControl &simcontrol,
+        const std::string &mission_file,
+        std::function<void(MissionParsePtr&, InterfacePtr&, InterfacePtr&)> viewer_callback,
+        double time_warp,
+        int task_id,
+        int job_id,
+        int seed) {
 
     auto mp = std::make_shared<MissionParse>();
-    if (!mp->parse(*found_mission)) {
-        std::cout << "scrimmage::run_test failed to parse " << mission << std::endl;
+    if (task_id != -1) mp->set_task_number(task_id);
+    if (job_id != -1) mp->set_job_number(job_id);
+    if (time_warp >= 0) mp->set_time_warp(time_warp);
+
+    if (!mp->parse(mission_file)) {
+        std::cout << "Failed to parse file: " << mission_file << std::endl;
         return boost::none;
     }
 
-    mp->create_log_dir();
+    std::string output_type = get("output_type", mp->params(), std::string("frames"));
+    bool output_all = output_type.find("all") != std::string::npos;
+    auto should_log = [&](std::string s) {
+        return output_all || output_type.find(s) != std::string::npos;
+    };
+
+    bool output_frames = should_log("frames");
+    bool output_summary = should_log("summary");
+    bool output_git = should_log("git_commits");
+    bool output_mission = should_log("mission");
+    bool output_seed = should_log("seed");
+    bool output_nothing =
+        !output_all && !output_frames && !output_summary &&
+        !output_git && !output_mission && !output_seed;
+
+    simcontrol.set_limited_verbosity(output_nothing);
+
+    if (!output_nothing) {
+        mp->create_log_dir();
+    }
+
     auto log = setup_logging(mp);
-    SimControl simcontrol;
+
+    // Overwrite the seed if it's set
+    if (seed != -1) mp->params()["seed"] = seed;
     simcontrol.set_log(log);
 
-    auto to_gui_interface = std::make_shared<Interface>();
-    auto from_gui_interface = std::make_shared<Interface>();
+    InterfacePtr to_gui_interface = std::make_shared<Interface>();
+    InterfacePtr from_gui_interface = std::make_shared<Interface>();
     to_gui_interface->set_log(log);
     from_gui_interface->set_log(log);
+
     simcontrol.set_incoming_interface(from_gui_interface);
     simcontrol.set_outgoing_interface(to_gui_interface);
 
-    mp->set_enable_gui(false);
-    mp->set_time_warp(0);
+    // Split off SimControl in it's own thread
+#if ENABLE_PYTHON_BINDINGS == 1
+    Py_Initialize();
+#endif
     simcontrol.set_mission_parse(mp);
     if (!simcontrol.init()) {
-        std::cout << "scrimmage::run_test call to SimControl::init() failed." << std::endl;
+        std::cout << "SimControl init() failed." << std::endl;
         return boost::none;
     }
 
+    bool display_progress = get("display_progress", mp->params(), true);
+    simcontrol.display_progress(display_progress);
+
+    if (!viewer_callback) mp->set_enable_gui(false);
+
+#if ENABLE_VIEWER == 0
     simcontrol.pause(false);
     simcontrol.run();
+#else
+    if (viewer_callback && simcontrol.enable_gui()) {
+        simcontrol.start();
+        viewer_callback(mp, to_gui_interface, from_gui_interface);
 
-    if (!simcontrol.output_runtime()) {
-        std::cout << "could not output runtime" << std::endl;
-        return boost::none;
+        // When the viewer finishes, tell simcontrol to exit
+        simcontrol.force_exit();
+        simcontrol.join();
+    } else {
+        simcontrol.pause(false);
+        simcontrol.run();
+    }
+#endif
+
+#if ENABLE_PYTHON_BINDINGS == 1
+    Py_Finalize();
+#endif
+    simcontrol.output_runtime();
+
+    // summary
+    if (output_summary && !simcontrol.output_summary()) return boost::none;
+
+    if (output_git) {
+        std::map<std::string, std::unordered_set<std::string>> commits =
+            simcontrol.plugin_manager()->get_commits();
+        std::string scrimmage_version = get_version();
+
+        if (scrimmage_version != "") {
+            commits[scrimmage_version].insert("scrimmage");
+        }
+
+        for (auto &kv : commits) {
+            std::string output = kv.first + ":";
+            for (const std::string &plugin_name : kv.second) {
+                output += plugin_name + ",";
+            }
+            output.pop_back();
+            log->write_ascii(output);
+        }
     }
 
-    if (!simcontrol.output_summary()) {
-        std::cout << "could not output summary" << std::endl;
-        return boost::none;
+    if (get("plot_tracks", mp->params(), false)) {
+        std::string plot_cmd = "plot_3d_fr.py " + log->frames_filename();
+        int result = std::system(plot_cmd.c_str());
+        if (result != 0) {
+            std::cout << "plot_tracks failed with return code: "
+                 << result << std::endl;
+        }
+    }
+
+    // Close the log file
+    log->close_log();
+
+    if (!output_nothing) {
+        std::cout << "Simulation Complete" << std::endl;
     }
 
     return mp->log_dir();
