@@ -30,35 +30,23 @@
  *
  */
 
-#ifndef INCLUDE_SCRIMMAGE_PUBSUB_MESSAGEBASE_H_
-#define INCLUDE_SCRIMMAGE_PUBSUB_MESSAGEBASE_H_
+#ifndef INCLUDE_SCRIMMAGE_PLUGINS_SENSOR_SCRIMMAGEOPENAISENSOR_SCRIMMAGEOPENAISENSOR_H_
+#define INCLUDE_SCRIMMAGE_PLUGINS_SENSOR_SCRIMMAGEOPENAISENSOR_SCRIMMAGEOPENAISENSOR_H_
 
-#include <string>
-#include <memory>
-
-#if ENABLE_PYTHON_BINDINGS == 1
-// #include <pybind11/pybind11.h>
-#endif
+#include <scrimmage/sensor/Sensor.h>
+#include <scrimmage/plugins/autonomy/ExternalControl/ExternalControl.h>
 
 namespace scrimmage {
-
-class MessageBase {
+namespace sensor {
+class ScrimmageOpenAISensor : public scrimmage::Sensor {
  public:
-    virtual ~MessageBase() {}       // http://stackoverflow.com/a/5831797
+    EnvParams observation_space;
+    ScrimmageOpenAISensor();
+    virtual const EnvValues &get_observations() {return observations;}
 
-    static const int undefined_id = -1;
-    double time;
-    std::string serialized_data;
-
-#if ENABLE_PYTHON_BINDINGS == 1
-    // void serialize_to_python(std::string module_name, std::string object_name);
-    // pybind11::object py_data;
-#endif
-
-    std::string debug_info = "";
+ protected:
+    EnvValues observations;
 };
-
-using MessageBasePtr = std::shared_ptr<MessageBase>;
-
+} // namespace sensor
 } // namespace scrimmage
-#endif // INCLUDE_SCRIMMAGE_PUBSUB_MESSAGEBASE_H_
+#endif // INCLUDE_SCRIMMAGE_PLUGINS_SENSOR_SCRIMMAGEOPENAISENSOR_SCRIMMAGEOPENAISENSOR_H_

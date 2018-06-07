@@ -39,18 +39,10 @@
 #include <string>
 #include <vector>
 
-namespace scrimmage_proto {
-class SpaceParams;
-class SpaceSample;
-}
-
 namespace scrimmage {
 namespace sensor {
 class RLConsensusSensor : public scrimmage::Sensor {
  public:
-    void init(std::map<std::string, std::string> &params) override;
-    scrimmage_proto::SpaceParams observation_space_params() override;
-    scrimmage::MessagePtr<scrimmage_proto::SpaceSample> sensor_msg_flat(double t) override;
 };
 } // namespace sensor
 } // namespace scrimmage

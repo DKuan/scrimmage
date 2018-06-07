@@ -33,24 +33,19 @@
 #ifndef INCLUDE_SCRIMMAGE_PLUGINS_SENSOR_RLSIMPLESENSOR_RLSIMPLESENSOR_H_
 #define INCLUDE_SCRIMMAGE_PLUGINS_SENSOR_RLSIMPLESENSOR_RLSIMPLESENSOR_H_
 
-#include <scrimmage/sensor/Sensor.h>
+#include <scrimmage/plugins/sensor/ScrimmageOpenAISensor/ScrimmageOpenAISensor.h>
 
 #include <map>
 #include <string>
 #include <vector>
 
-namespace scrimmage_proto {
-class SpaceParams;
-class SpaceSample;
-}
-
 namespace scrimmage {
 namespace sensor {
 
-class RLSimpleSensor : public scrimmage::Sensor {
+class RLSimpleSensor : public ScrimmageOpenAISensor {
  public:
-    scrimmage_proto::SpaceParams observation_space_params() override;
-    scrimmage::MessagePtr<scrimmage_proto::SpaceSample> sensor_msg_flat(double t) override;
+    void init(std::map<std::string, std::string> &params) override;
+    const EnvValues &get_observations() override;
 };
 
 } // namespace sensor

@@ -50,6 +50,10 @@
 #include <boost/range/algorithm/set_algorithm.hpp>
 #include <boost/range/adaptor/map.hpp>
 
+#if ENABLE_PYTHON_BINDINGS == 1
+#include <pybind11/pybind11.h>
+#endif
+
 namespace br = boost::range;
 namespace ba = boost::adaptors;
 
@@ -188,7 +192,7 @@ void print_io_error(const std::string &in_name, VariableIO &v) {
 }
 
 namespace {
-// https://stackoverflow.com/a/48164204 
+// https://stackoverflow.com/a/48164204
 std::function<void(int)> shutdown_handler;
 void signal_handler(int signal) { shutdown_handler(signal); }
 } // namespace
@@ -205,7 +209,7 @@ boost::optional<std::string> run_test(std::string mission) {
         // Handle kill signals
         struct sigaction sa;
         memset( &sa, 0, sizeof(sa) );
-        shutdown_handler = [&](int s){
+        shutdown_handler = [&](int /*s*/){
             std::cout << std::endl << "Exiting gracefully" << std::endl;
             simcontrol.force_exit();
         };
@@ -214,41 +218,42 @@ boost::optional<std::string> run_test(std::string mission) {
         sigaction(SIGINT, &sa, NULL);
         sigaction(SIGTERM, &sa, NULL);
 
-        const double time_warp = 0;
-        return run_scrimmage(simcontrol, *found_mission, nullptr, time_warp);
+        auto mp = std::make_shared<MissionParse>();
+        mp->set_time_warp(-1);
+        mp->set_enable_gui(false);
+
+        if (!mp->parse(*found_mission)) {
+            std::cout << "Failed to parse file: " << *found_mission << std::endl;
+            return boost::none;
+        }
+
+        auto log = preprocess_scrimmage(mp, simcontrol);
+        if (log == nullptr) {
+            return boost::none;
+        }
+        simcontrol.pause(false);
+        simcontrol.run();
+
+        return postprocess_scrimmage(mp, simcontrol, log);
     }
 }
 
-boost::optional<std::string> run_scrimmage(
-        SimControl &simcontrol,
-        const std::string &mission_file,
-        std::function<void(MissionParsePtr&, InterfacePtr&, InterfacePtr&)> viewer_callback,
-        double time_warp,
-        int task_id,
-        int job_id,
-        int seed) {
-
-    auto mp = std::make_shared<MissionParse>();
-    if (task_id != -1) mp->set_task_number(task_id);
-    if (job_id != -1) mp->set_job_number(job_id);
-    if (time_warp >= 0) mp->set_time_warp(time_warp);
-
-    if (!mp->parse(mission_file)) {
-        std::cout << "Failed to parse file: " << mission_file << std::endl;
-        return boost::none;
-    }
-
+bool logging_logic(MissionParsePtr mp, std::string s) {
     std::string output_type = get("output_type", mp->params(), std::string("frames"));
     bool output_all = output_type.find("all") != std::string::npos;
-    auto should_log = [&](std::string s) {
-        return output_all || output_type.find(s) != std::string::npos;
-    };
+    return output_all || output_type.find(s) != std::string::npos;
+}
 
-    bool output_frames = should_log("frames");
-    bool output_summary = should_log("summary");
-    bool output_git = should_log("git_commits");
-    bool output_mission = should_log("mission");
-    bool output_seed = should_log("seed");
+std::shared_ptr<Log> preprocess_scrimmage(
+        MissionParsePtr mp,
+        SimControl &simcontrol) {
+
+    bool output_all = logging_logic(mp, "all");
+    bool output_frames = logging_logic(mp, "frames");
+    bool output_summary = logging_logic(mp, "summary");
+    bool output_git = logging_logic(mp, "git_commits");
+    bool output_mission = logging_logic(mp, "mission");
+    bool output_seed = logging_logic(mp, "seed");
     bool output_nothing =
         !output_all && !output_frames && !output_summary &&
         !output_git && !output_mission && !output_seed;
@@ -262,7 +267,6 @@ boost::optional<std::string> run_scrimmage(
     auto log = setup_logging(mp);
 
     // Overwrite the seed if it's set
-    if (seed != -1) mp->params()["seed"] = seed;
     simcontrol.set_log(log);
 
     InterfacePtr to_gui_interface = std::make_shared<Interface>();
@@ -273,37 +277,22 @@ boost::optional<std::string> run_scrimmage(
     simcontrol.set_incoming_interface(from_gui_interface);
     simcontrol.set_outgoing_interface(to_gui_interface);
 
-    // Split off SimControl in it's own thread
 #if ENABLE_PYTHON_BINDINGS == 1
     Py_Initialize();
 #endif
     simcontrol.set_mission_parse(mp);
     if (!simcontrol.init()) {
         std::cout << "SimControl init() failed." << std::endl;
-        return boost::none;
+        return nullptr;
     }
 
     bool display_progress = get("display_progress", mp->params(), true);
     simcontrol.display_progress(display_progress);
+    return log;
+}
 
-    if (!viewer_callback) mp->set_enable_gui(false);
-
-#if ENABLE_VIEWER == 0
-    simcontrol.pause(false);
-    simcontrol.run();
-#else
-    if (viewer_callback && simcontrol.enable_gui()) {
-        simcontrol.start();
-        viewer_callback(mp, to_gui_interface, from_gui_interface);
-
-        // When the viewer finishes, tell simcontrol to exit
-        simcontrol.force_exit();
-        simcontrol.join();
-    } else {
-        simcontrol.pause(false);
-        simcontrol.run();
-    }
-#endif
+boost::optional<std::string> postprocess_scrimmage(
+      MissionParsePtr mp, SimControl &simcontrol, std::shared_ptr<Log> &log) {
 
 #if ENABLE_PYTHON_BINDINGS == 1
     Py_Finalize();
@@ -311,6 +300,15 @@ boost::optional<std::string> run_scrimmage(
     simcontrol.output_runtime();
 
     // summary
+    bool output_all = logging_logic(mp, "all");
+    bool output_frames = logging_logic(mp, "frames");
+    bool output_summary = logging_logic(mp, "summary");
+    bool output_git = logging_logic(mp, "git_commits");
+    bool output_mission = logging_logic(mp, "mission");
+    bool output_seed = logging_logic(mp, "seed");
+    bool output_nothing =
+        !output_all && !output_frames && !output_summary &&
+        !output_git && !output_mission && !output_seed;
     if (output_summary && !simcontrol.output_summary()) return boost::none;
 
     if (output_git) {

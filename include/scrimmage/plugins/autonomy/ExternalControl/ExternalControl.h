@@ -37,31 +37,41 @@
 #include <scrimmage/proto/ExternalControl.pb.h>
 
 #include <map>
+#include <vector>
 #include <string>
 #include <limits>
 #include <utility>
 
 namespace scrimmage {
 
+struct EnvParams {
+    std::vector<double> discrete_maxima;
+    std::vector<std::pair<double, double>> continuous_extrema;
+};
+
+struct EnvValues {
+    std::vector<int> discrete;
+    std::vector<double> continuous;
+};
+
 namespace autonomy {
 
 class ExternalControl : public scrimmage::Autonomy {
  public:
+    ExternalControl();
+
     // normal overrides
     void init(std::map<std::string, std::string> &params) override;
     bool step_autonomy(double t, double dt) override;
 
-    // helper functions that do not get overridden
-    void get_observation(double t, scrimmage_proto::SpaceSample *observation);
-    void set_action(const scrimmage_proto::Action &action);
-    scrimmage_proto::Environment get_env();
-
     // override 2 new functions: calc_reward and action_space_params
     virtual std::pair<bool, double> calc_reward(double t, double dt);
 
- protected:
-    virtual scrimmage_proto::SpaceParams action_space_params();
+    std::pair<double, double> reward_range;
+    EnvParams action_space;
+    EnvValues action;
 
+ protected:
     bool check_action(
         const scrimmage_proto::Action &action,
         uint64_t discrete_action_size,

@@ -69,6 +69,22 @@ void RLSimple::init(std::map<std::string, std::string> &params) {
     radius_ = std::stod(params.at("radius"));
 
     ExternalControl::init(params);
+
+    if (x_discrete_) {
+        action_space.discrete_maxima.push_back(1);
+    } else {
+        const double inf = std::numeric_limits<double>::infinity();
+        action_space.continuous_extrema.push_back(std::make_pair(-inf, inf));
+    }
+
+    if (ctrl_y_) {
+        if (y_discrete_) {
+            action_space.discrete_maxima.push_back(1);
+        } else {
+            const double inf = std::numeric_limits<double>::infinity();
+            action_space.continuous_extrema.push_back(std::make_pair(-inf, inf));
+        }
+    }
 }
 
 std::pair<bool, double> RLSimple::calc_reward(double t, double dt) {
@@ -101,28 +117,6 @@ bool RLSimple::step_autonomy(double /*t*/, double /*dt*/) {
     vars_.output(output_vel_x_idx_, x_vel);
     vars_.output(output_vel_y_idx_, y_vel);
     return true;
-}
-
-scrimmage_proto::SpaceParams RLSimple::action_space_params() {
-    sp::SpaceParams space_params;
-
-    // x control
-    sp::SingleSpaceParams *x_ctrl_params = space_params.add_params();
-    x_ctrl_params->set_num_dims(1);
-    x_ctrl_params->set_discrete(x_discrete_);
-    x_ctrl_params->add_minimum(x_discrete_ ? 0 : -std::numeric_limits<double>::infinity());
-    x_ctrl_params->add_maximum(x_discrete_ ? 1 : std::numeric_limits<double>::infinity());
-
-    // y control
-    if (ctrl_y_) {
-        sp::SingleSpaceParams *y_ctrl_params = space_params.add_params();
-        y_ctrl_params->set_num_dims(1);
-        y_ctrl_params->set_discrete(y_discrete_);
-        y_ctrl_params->add_minimum(y_discrete_ ? 0 : -std::numeric_limits<double>::infinity());
-        y_ctrl_params->add_maximum(y_discrete_ ? 1 : std::numeric_limits<double>::infinity());
-    }
-
-    return space_params;
 }
 
 } // namespace autonomy

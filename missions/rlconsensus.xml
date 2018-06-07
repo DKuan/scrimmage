@@ -33,9 +33,9 @@
   <origin_length>10</origin_length>
   <camera focal_point="0,0,0" follow_id="4" mode="free" pos="0,0.01,50" show_fps="false" />
 
-  <entity_interaction
-    server_address="localhost:50051"
-    timeout="5">ExternalControlInteraction</entity_interaction>
+  <!-- <entity_interaction -->
+  <!--   server_address="localhost:50051" -->
+  <!--   timeout="5">ExternalControlInteraction</entity_interaction> -->
 
   <seed>3361078855</seed>
 

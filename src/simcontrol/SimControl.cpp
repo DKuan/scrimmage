@@ -1407,4 +1407,8 @@ bool SimControl::output_summary() {
 void SimControl::set_limited_verbosity(bool limited_verbosity) {
     limited_verbosity_ = limited_verbosity;
 }
+
+InterfacePtr SimControl::incoming_interface() {return incoming_interface_;}
+InterfacePtr SimControl::outgoing_interface() {return outgoing_interface_;}
+std::list<EntityPtr> &SimControl::ents() {return ents_;}
 } // namespace scrimmage

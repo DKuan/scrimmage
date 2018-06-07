@@ -52,6 +52,7 @@ namespace autonomy {
 
 void RLConsensus::init(std::map<std::string, std::string> &params) {
     RLSimple::init(params);
+    reward_range = std::make_pair(-1, 1);
 }
 
 std::pair<bool, double> RLConsensus::calc_reward(double /*t*/, double /*dt*/) {

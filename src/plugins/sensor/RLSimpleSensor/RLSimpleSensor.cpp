@@ -49,26 +49,14 @@ REGISTER_PLUGIN(scrimmage::Sensor, scrimmage::sensor::RLSimpleSensor, RLSimpleSe
 namespace scrimmage {
 namespace sensor {
 
-scrimmage::MessagePtr<scrimmage_proto::SpaceSample>
-RLSimpleSensor::sensor_msg_flat(double /*t*/) {
-    auto msg = std::make_shared<sc::Message<sp::SpaceSample>>();
-    msg->data.add_value(parent_->state()->pos()(0));
-    return msg;
+void RLSimpleSensor::init(std::map<std::string, std::string> &/*params*/) {
+    const double inf = std::numeric_limits<double>::infinity();
+    observation_space.continuous_extrema.push_back(std::make_pair(-inf, inf));
 }
 
-scrimmage_proto::SpaceParams RLSimpleSensor::observation_space_params() {
-    sp::SpaceParams space_params;
-
-    const int num_neigh = parent_->contacts()->size();
-    const double inf = std::numeric_limits<double>::infinity();
-
-    sp::SingleSpaceParams *single_space_params = space_params.add_params();
-    single_space_params->set_num_dims(num_neigh);
-    single_space_params->add_minimum(-inf);
-    single_space_params->add_maximum(inf);
-    single_space_params->set_discrete(false);
-
-    return space_params;
+const EnvValues &RLSimpleSensor::get_observations() {
+    observations.continuous[0] = parent_->state()->pos()(0);
+    return observations;
 }
 
 } // namespace sensor

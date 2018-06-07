@@ -35,7 +35,6 @@
 
 #include <scrimmage/fwd_decl.h>
 
-#include <scrimmage/simcontrol/SimControl.h>
 
 #include <functional>
 #include <memory>
@@ -48,7 +47,7 @@ template <class T> class optional;
 }
 
 namespace scrimmage {
-
+class SimControl;
 struct SimUtilsInfo {
     MissionParsePtr mp;
     PluginManagerPtr plugin_manager;
@@ -75,14 +74,12 @@ bool verify_io_connection(VariableIO &output_plugin, VariableIO &input_plugin);
 
 boost::optional<std::string> run_test(std::string mission);
 
-boost::optional<std::string> run_scrimmage(
-        SimControl &simcontrol,
-        const std::string &mission_file,
-        std::function<void(MissionParsePtr&, InterfacePtr&, InterfacePtr&)> viewer_callback = nullptr,
-        double time_warp = -1,
-        int task_id = -1,
-        int job_id = -1,
-        int seed = -1);
+bool logging_logic(MissionParsePtr mp, std::string s);
+
+std::shared_ptr<Log> preprocess_scrimmage(MissionParsePtr mp, SimControl &simcontrol);
+
+boost::optional<std::string> postprocess_scrimmage(
+      MissionParsePtr mp, SimControl &simcontrol, std::shared_ptr<Log> &log);
 
 bool check_output(std::string output_type, std::string desired_output);
 

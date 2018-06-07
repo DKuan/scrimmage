@@ -40,7 +40,7 @@
   <seed>3361078855</seed>
 
   <entity_common name="all">
-      <count>1</count>
+      <count>2</count>
       <health>1</health>
       <radius>1</radius>
 

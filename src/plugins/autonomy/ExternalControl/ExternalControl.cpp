@@ -53,6 +53,10 @@ REGISTER_PLUGIN(scrimmage::Autonomy, scrimmage::autonomy::ExternalControl, Exter
 namespace scrimmage {
 namespace autonomy {
 
+ExternalControl::ExternalControl() :
+    reward_range(-std::numeric_limits<double>::infinity(),
+                 std::numeric_limits<double>::infinity()) {}
+
 void ExternalControl::init(std::map<std::string, std::string> &params) {
     print_err_on_exit = false;
     return;
@@ -64,21 +68,6 @@ bool ExternalControl::step_autonomy(double t, double dt) {
 
 std::pair<bool, double> ExternalControl::calc_reward(double t, double dt) {
     return {false, 0.0};
-}
-
-void ExternalControl::get_observation(
-        double t, scrimmage_proto::SpaceSample *observation) {
-
-    observation->clear_value();
-    for (auto &kv : parent_->sensors()) {
-        auto msg = kv.second->sensor_msg_flat(t);
-        if (msg) {
-            sp::SpaceSample &sample = msg->data;
-            for (int i = 0; i < sample.value_size(); i++) {
-                observation->add_value(sample.value(i));
-            }
-        }
-    }
 }
 
 bool ExternalControl::check_action(
@@ -99,59 +88,6 @@ bool ExternalControl::check_action(
         return false;
     }
     return true;
-}
-
-scrimmage_proto::Environment ExternalControl::get_env() {
-    sp::Environment env;
-
-    *env.mutable_action_spaces() = action_space_params();
-
-    sp::SpaceParams *obs_space = env.mutable_observation_spaces();
-
-    for (auto &kv : parent_->sensors()) {
-        auto obs_space_params = kv.second->observation_space_params();
-        for (const sp::SingleSpaceParams params : obs_space_params.params()) {
-            *obs_space->add_params() = params;
-        }
-    }
-
-    env.set_min_reward(min_reward_);
-    env.set_max_reward(max_reward_);
-
-    return env;
-}
-
-scrimmage_proto::SpaceParams ExternalControl::action_space_params() {
-    sp::SpaceParams space_params;
-    sp::SingleSpaceParams *single_space_params = space_params.add_params();
-    single_space_params->set_num_dims(9);
-    single_space_params->set_discrete(false);
-
-    for (int i = 0; i < 6; i++) {
-        // we have to use non-infinite bounds for openai's tuple_space to give
-        // non-nan values when the sample method on tuple_space is called
-        const double inf = std::numeric_limits<float>::max();
-        single_space_params->add_minimum(-inf);
-        single_space_params->add_maximum(inf);
-    }
-
-    // roll
-    single_space_params->add_minimum(-M_PI);
-    single_space_params->add_maximum(M_PI);
-
-    // pitch
-    single_space_params->add_minimum(-M_PI / 2);
-    single_space_params->add_maximum(M_PI / 2);
-
-    // yaw
-    single_space_params->add_minimum(-M_PI / 2);
-    single_space_params->add_maximum(M_PI / 2);
-
-    return space_params;
-}
-
-void ExternalControl::set_action(const scrimmage_proto::Action &action) {
-    action_ = action;
 }
 
 } // namespace autonomy

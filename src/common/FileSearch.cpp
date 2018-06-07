@@ -169,6 +169,7 @@ void FileSearch::find_files(std::string env_var, const std::string &ext,
         }
 
         env_path = std::string(env_p);
+        dbg(env_var + " = " + env_path);
     } else {
         // assume is is a path rather than an environment variable
         // since slashes cannot be in an environment variable

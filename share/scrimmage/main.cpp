@@ -125,23 +125,50 @@ int main(int argc, char *argv[]) {
     }
 
     std::string mission_file = argv[optind];
-    int seed_int = seed_set ? std::stoi(seed) : -1;
-    int disable_gui = false;
+    auto mp = std::make_shared<sc::MissionParse>();
+    if (task_id != -1) mp->set_task_number(task_id);
+    if (job_id != -1) mp->set_job_number(job_id);
 
-    auto viewer_callback = [](sc::MissionParsePtr &mp, sc::InterfacePtr &to_gui_interface, sc::InterfacePtr &from_gui_interface) {
+    if (!mp->parse(mission_file)) {
+        std::cout << "Failed to parse file: " << mission_file << std::endl;
+        return -1;
+    }
+
+    std::cout << "enable gui = " << mp->enable_gui() << std::endl;
+    if (seed_set) mp->params()["seed"] = seed;
+
+    auto log = sc::preprocess_scrimmage(mp, simcontrol);
+    if (log == nullptr) {
+        return -1;
+    }
+
+#if ENABLE_VIEWER == 0
+    simcontrol.pause(false);
+    simcontrol.run();
+#else
+    if (simcontrol.enable_gui()) {
+        simcontrol.start();
         scrimmage::Viewer viewer;
-        viewer.set_incoming_interface(to_gui_interface);
-        viewer.set_outgoing_interface(from_gui_interface);
+
+        auto outgoing = simcontrol.outgoing_interface();
+        auto incoming = simcontrol.incoming_interface();
+
+        viewer.set_incoming_interface(outgoing);
+        viewer.set_outgoing_interface(incoming);
         viewer.set_enable_network(false);
         viewer.init(mp->attributes()["camera"], mp->log_dir(), mp->dt());
         viewer.run();
-    };
 
-    const double time_warp = -1;
-    auto log = sc::run_scrimmage(
-        simcontrol, mission_file, viewer_callback, time_warp, task_id, job_id, seed_int);
+        // When the viewer finishes, tell simcontrol to exit
+        simcontrol.force_exit();
+        simcontrol.join();
+    } else {
+        simcontrol.pause(false);
+        simcontrol.run();
+    }
+#endif
 
-    if (log) {
+    if (sc::postprocess_scrimmage(mp, simcontrol, log)) {
         return 0;
     } else {
         return -1;

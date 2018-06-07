@@ -127,10 +127,13 @@ class SimControl {
     void step_taken();
 
     void set_incoming_interface(InterfacePtr &incoming_interface);
+    InterfacePtr incoming_interface();
 
     void set_outgoing_interface(InterfacePtr &outgoing_interface);
+    InterfacePtr outgoing_interface();
 
     void set_limited_verbosity(bool limited_verbosity);
+    std::list<EntityPtr> &ents();
 
  protected:
     // Key: Entity ID

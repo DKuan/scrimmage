@@ -37,12 +37,14 @@ import signal
 import numpy as np
 import gym
 import scrimmage
+import lvdb
 
 MISSION_FILE = 'rlsimple.xml'
 TEMP_MISSION_FILE = '.rlsimple.xml'
 
 
 def _run_test(version, combine_actors, get_action):
+    lvdb.set_trace()
     try:
         env = gym.make(version)
     except gym.error.Error:
