@@ -217,7 +217,7 @@ def test_two_not_combined_veh_dim_discrete():
     assert obs[0][1] == 0
     assert isinstance(env.action_space, gym.spaces.Tuple)
     assert isinstance(env.observation_space, gym.spaces.Tuple)
-    assert total_reward == 6
+    assert total_reward == 8
 
 
 def test_sim_end():
@@ -236,9 +236,9 @@ def test_sim_end():
 
 
 if __name__ == '__main__':
-    # test_one_dim_discrete()
-    # test_two_dim_discrete()
-    # test_one_dim_continuous()
-    # test_two_combined_veh_dim_discrete()
+    test_one_dim_discrete()
+    test_two_dim_discrete()
+    test_one_dim_continuous()
+    test_two_combined_veh_dim_discrete()
     test_two_not_combined_veh_dim_discrete()
-    # test_sim_end()
+    test_sim_end()

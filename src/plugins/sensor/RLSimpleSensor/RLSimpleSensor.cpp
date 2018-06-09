@@ -49,13 +49,13 @@ REGISTER_PLUGIN(scrimmage::Sensor, scrimmage::sensor::RLSimpleSensor, RLSimpleSe
 namespace scrimmage {
 namespace sensor {
 
-void RLSimpleSensor::init(std::map<std::string, std::string> &/*params*/) {
-    const double inf = std::numeric_limits<double>::infinity();
-    observation_space.continuous_extrema.push_back(std::make_pair(-inf, inf));
+void RLSimpleSensor::get_observation(double *data, uint32_t beg_idx, uint32_t /*end_idx*/) {
+    data[beg_idx] = parent_->state()->pos()(0);
 }
 
-void RLSimpleSensor::get_observation(double *data, int beg_idx, int /*end_idx*/) {
-    data[beg_idx] = parent_->state()->pos()(0);
+void RLSimpleSensor::set_observation_space() {
+    const double inf = std::numeric_limits<double>::infinity();
+    observation_space.continuous_extrema.push_back(std::make_pair(-inf, inf));
 }
 
 } // namespace sensor

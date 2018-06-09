@@ -96,7 +96,7 @@ class ScrimmageOpenAIEnv {
     void update_observation();
     std::tuple<pybind11::float_, pybind11::bool_, pybind11::dict> calc_reward();
     void distribute_action(pybind11::object action);
-    void reset_scrimmage();
+    void reset_scrimmage(bool enable_gui);
     void run_viewer();
     int loop_number_ = 0;
     std::thread viewer_thread_;
@@ -109,10 +109,11 @@ class ScrimmageOpenAIEnv {
     pybind11::object get_gym_space(const std::string &type);
     bool is_gym_instance(pybind11::object &obj, const std::string &type);
 
-    PyObject *tuple_space;
-    PyObject *discrete_space;
-    PyObject *multidiscrete_space;
-    PyObject *box_space;
+    pybind11::object tuple_space_;
+    pybind11::object discrete_space_;
+    pybind11::object multidiscrete_space_;
+    pybind11::object box_space_;
+    pybind11::object asarray_;
 
  private:
     void to_continuous(std::vector<std::pair<double, double>> &p,

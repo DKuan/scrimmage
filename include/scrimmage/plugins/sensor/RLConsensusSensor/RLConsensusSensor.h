@@ -33,7 +33,7 @@
 #ifndef INCLUDE_SCRIMMAGE_PLUGINS_SENSOR_RLCONSENSUSSENSOR_RLCONSENSUSSENSOR_H_
 #define INCLUDE_SCRIMMAGE_PLUGINS_SENSOR_RLCONSENSUSSENSOR_RLCONSENSUSSENSOR_H_
 
-#include <scrimmage/sensor/Sensor.h>
+#include <scrimmage/plugins/sensor/ScrimmageOpenAISensor/ScrimmageOpenAISensor.h>
 
 #include <map>
 #include <string>
@@ -41,8 +41,11 @@
 
 namespace scrimmage {
 namespace sensor {
-class RLConsensusSensor : public scrimmage::Sensor {
+class RLConsensusSensor : public ScrimmageOpenAISensor {
  public:
+    RLConsensusSensor(); 
+    void set_observation_space() override;
+    void get_observation(double *data, uint32_t beg_idx, uint32_t end_idx) override;
 };
 } // namespace sensor
 } // namespace scrimmage

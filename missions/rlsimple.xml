@@ -2,11 +2,11 @@
 
   <run dt="1"
     end="100"
-    enable_gui="false"
+    enable_gui="true"
     network_gui="false"
     start="0.0"
     start_paused="true"
-    time_warp="0" />
+    time_warp="10" />
 
   <stream_port>50051</stream_port>
   <stream_ip>localhost</stream_ip>
