@@ -44,18 +44,16 @@ TEMP_MISSION_FILE = '.rlsimple.xml'
 
 
 def _run_test(version, combine_actors, get_action):
-    lvdb.set_trace()
     try:
         env = gym.make(version)
     except gym.error.Error:
         gym.envs.register(
             id=version,
-            entry_point='scrimmage.external_control:ScrimmageEnv',
+            entry_point='scrimmage:ScrimmageOpenAIEnv',
             max_episode_steps=1e9,
             reward_threshold=1e9,
             kwargs={"enable_gui": False,
                     "combine_actors": combine_actors,
-                    "timeout": 600,
                     "mission_file": TEMP_MISSION_FILE}
         )
         env = gym.make(version)
@@ -63,12 +61,12 @@ def _run_test(version, combine_actors, get_action):
     # the observation is the state of the aircraft
     obs = []
 
-    obs.append(env.reset())
+    obs.append(copy.deepcopy(env.reset()))
     total_reward = 0
     for i in range(1000):
         action = get_action(i)
         temp_obs, reward, done = env.step(action)[:3]
-        obs.append(temp_obs)
+        obs.append(copy.deepcopy(temp_obs))
         try:
             total_reward += sum(reward)
         except TypeError:
@@ -141,11 +139,11 @@ def test_one_dim_discrete():
     env, obs, total_reward = _run_test(VERSION, combine_actors, _get_action)
 
     assert len(obs[0]) == 1
-    assert obs[0] == 0
+    assert obs[0][0] == 0
     assert isinstance(env.action_space, gym.spaces.Discrete)
     assert isinstance(env.observation_space, gym.spaces.Box)
     assert env.action_space.n == 2
-    assert total_reward == 3
+    assert total_reward == 4
 
 
 def test_two_dim_discrete():
@@ -164,7 +162,7 @@ def test_two_dim_discrete():
     assert isinstance(env.action_space, gym.spaces.MultiDiscrete)
     assert isinstance(env.observation_space, gym.spaces.Box)
     assert np.array_equal(env.action_space.nvec, np.array([2, 2], dtype=int))
-    assert total_reward == 3
+    assert total_reward == 4
 
 
 def test_one_dim_continuous():
@@ -182,7 +180,7 @@ def test_one_dim_continuous():
     assert obs[0] == 0
     assert isinstance(env.action_space, gym.spaces.Box)
     assert isinstance(env.observation_space, gym.spaces.Box)
-    assert total_reward == 3
+    assert total_reward == 4
 
 
 def test_two_combined_veh_dim_discrete():
@@ -200,7 +198,7 @@ def test_two_combined_veh_dim_discrete():
     assert np.array_equal(obs[0], np.array([0., 0.]))
     assert isinstance(env.action_space, gym.spaces.MultiDiscrete)
     assert isinstance(env.observation_space, gym.spaces.Box)
-    assert total_reward == 6
+    assert total_reward == 8
 
 
 def test_two_not_combined_veh_dim_discrete():
@@ -238,9 +236,9 @@ def test_sim_end():
 
 
 if __name__ == '__main__':
-    test_one_dim_discrete()
+    # test_one_dim_discrete()
     # test_two_dim_discrete()
     # test_one_dim_continuous()
     # test_two_combined_veh_dim_discrete()
-    # test_two_not_combined_veh_dim_discrete()
+    test_two_not_combined_veh_dim_discrete()
     # test_sim_end()

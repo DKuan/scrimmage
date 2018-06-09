@@ -6,7 +6,7 @@
     network_gui="false"
     start="0.0"
     start_paused="true"
-    time_warp="30" />
+    time_warp="0" />
 
   <stream_port>50051</stream_port>
   <stream_ip>localhost</stream_ip>
@@ -20,7 +20,7 @@
   <gui_update_period>10</gui_update_period> 
 
   <plot_tracks>false</plot_tracks>
-  <output_type>all</output_type>
+  <output_type>nothing</output_type>
   <display_progress>true</display_progress>
   <show_plugins>false</show_plugins>
 
@@ -33,14 +33,14 @@
   <origin_length>10</origin_length>
   <camera focal_point="0,0,0" follow_id="4" mode="free" pos="0,0.01,50" show_fps="false" />
 
-  <entity_interaction
-    server_address="localhost:50051"
-    timeout="5">ExternalControlInteraction</entity_interaction>
+  <!-- <entity_interaction -->
+  <!--   server_address="localhost:50051" -->
+  <!--   timeout="5">ExternalControlInteraction</entity_interaction> -->
 
   <seed>3361078855</seed>
 
   <entity_common name="all">
-      <count>2</count>
+      <count>1</count>
       <health>1</health>
       <radius>1</radius>
 

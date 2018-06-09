@@ -32,15 +32,17 @@
 
 #include <pybind11/pybind11.h>
 
-#include <scrimmage/simcontrol/SimControl.h>
+#include <scrimmage/parse/MissionParse.h>
 #include <scrimmage/plugins/autonomy/ExternalControl/ExternalControl.h>
 #include <scrimmage/plugins/sensor/ScrimmageOpenAISensor/ScrimmageOpenAISensor.h>
+#include <scrimmage/simcontrol/SimControl.h>
 
 #include <string>
 #include <memory>
 #include <vector>
 #include <thread> // NOLINT
 #include <utility>
+#include <tuple>
 
 class ScrimmageOpenAIEnv {
  public:
@@ -57,25 +59,30 @@ class ScrimmageOpenAIEnv {
     void close();
     void render();
     void seed(pybind11::object _seed = pybind11::none());
+    ScrimmageOpenAIEnv *get_this() {return this;}
+
+    pybind11::object spec;
+    pybind11::object metadata;
 
     pybind11::object env;
     pybind11::tuple reward_range;
     pybind11::object action_space;
     pybind11::object observation_space;
+    pybind11::object observation;
 
  protected:
     pybind11::object warning_function_;
 
     std::string mission_file_ = "";
-    bool enable_gui_ = false;
     bool combine_actors_ = false;
-    bool global_sensor = false;
+    bool global_sensor_ = false;
+    bool enable_gui_ = false;
 
     std::thread thread_;
 
     scrimmage::SimControl simcontrol_;
-    void run_simcontrol();
     std::shared_ptr<scrimmage::Log> log_;
+    scrimmage::MissionParsePtr mp_;
 
     using ExternalControlPtr = std::shared_ptr<scrimmage::autonomy::ExternalControl>;
     using ScrimmageOpenAISensor = std::shared_ptr<scrimmage::sensor::ScrimmageOpenAISensor>;
@@ -86,12 +93,26 @@ class ScrimmageOpenAIEnv {
     void set_reward_range();
     void create_action_space();
     void create_observation_space();
+    void update_observation();
+    std::tuple<pybind11::float_, pybind11::bool_, pybind11::dict> calc_reward();
+    void distribute_action(pybind11::object action);
+    void reset_scrimmage();
+    void run_viewer();
+    int loop_number_ = 0;
+    std::thread viewer_thread_;
 
     pybind11::object create_space(
             pybind11::list discrete_maxima,
             pybind11::list continuous_minima,
             pybind11::list continuous_maxima);
 
+    pybind11::object get_gym_space(const std::string &type);
+    bool is_gym_instance(pybind11::object &obj, const std::string &type);
+
+    PyObject *tuple_space;
+    PyObject *discrete_space;
+    PyObject *multidiscrete_space;
+    PyObject *box_space;
 
  private:
     void to_continuous(std::vector<std::pair<double, double>> &p,

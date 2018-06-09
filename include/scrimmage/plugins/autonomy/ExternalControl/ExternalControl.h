@@ -45,7 +45,7 @@
 namespace scrimmage {
 
 struct EnvParams {
-    std::vector<double> discrete_maxima;
+    std::vector<double> discrete_count;
     std::vector<std::pair<double, double>> continuous_extrema;
 };
 
@@ -64,22 +64,11 @@ class ExternalControl : public scrimmage::Autonomy {
     void init(std::map<std::string, std::string> &params) override;
     bool step_autonomy(double t, double dt) override;
 
-    // override 2 new functions: calc_reward and action_space_params
+    // additional override
     virtual std::pair<bool, double> calc_reward(double t, double dt);
-
     std::pair<double, double> reward_range;
     EnvParams action_space;
     EnvValues action;
-
- protected:
-    bool check_action(
-        const scrimmage_proto::Action &action,
-        uint64_t discrete_action_size,
-        uint64_t continuous_action_size);
-
-    scrimmage_proto::Action action_;
-    double min_reward_ = -std::numeric_limits<double>::infinity();
-    double max_reward_ = std::numeric_limits<double>::infinity();
 };
 } // namespace autonomy
 } // namespace scrimmage

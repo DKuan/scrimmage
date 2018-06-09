@@ -277,9 +277,6 @@ std::shared_ptr<Log> preprocess_scrimmage(
     simcontrol.set_incoming_interface(from_gui_interface);
     simcontrol.set_outgoing_interface(to_gui_interface);
 
-#if ENABLE_PYTHON_BINDINGS == 1
-    Py_Initialize();
-#endif
     simcontrol.set_mission_parse(mp);
     if (!simcontrol.init()) {
         std::cout << "SimControl init() failed." << std::endl;
@@ -294,9 +291,6 @@ std::shared_ptr<Log> preprocess_scrimmage(
 boost::optional<std::string> postprocess_scrimmage(
       MissionParsePtr mp, SimControl &simcontrol, std::shared_ptr<Log> &log) {
 
-#if ENABLE_PYTHON_BINDINGS == 1
-    Py_Finalize();
-#endif
     simcontrol.output_runtime();
 
     // summary

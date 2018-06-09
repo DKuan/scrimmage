@@ -134,8 +134,11 @@ int main(int argc, char *argv[]) {
         return -1;
     }
 
-    std::cout << "enable gui = " << mp->enable_gui() << std::endl;
     if (seed_set) mp->params()["seed"] = seed;
+
+#if ENABLE_PYTHON_BINDINGS == 1
+    Py_Initialize();
+#endif
 
     auto log = sc::preprocess_scrimmage(mp, simcontrol);
     if (log == nullptr) {
@@ -173,5 +176,9 @@ int main(int argc, char *argv[]) {
     } else {
         return -1;
     }
+
+#if ENABLE_PYTHON_BINDINGS == 1
+    Py_Finalize();
+#endif
 }
 

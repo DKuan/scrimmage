@@ -57,37 +57,17 @@ ExternalControl::ExternalControl() :
     reward_range(-std::numeric_limits<double>::infinity(),
                  std::numeric_limits<double>::infinity()) {}
 
-void ExternalControl::init(std::map<std::string, std::string> &params) {
+void ExternalControl::init(std::map<std::string, std::string> &/*params*/) {
     print_err_on_exit = false;
     return;
 }
 
-bool ExternalControl::step_autonomy(double t, double dt) {
+bool ExternalControl::step_autonomy(double /*t*/, double /*dt*/) {
     return false;
 }
 
-std::pair<bool, double> ExternalControl::calc_reward(double t, double dt) {
+std::pair<bool, double> ExternalControl::calc_reward(double /*t*/, double /*dt*/) {
     return {false, 0.0};
-}
-
-bool ExternalControl::check_action(
-        const scrimmage_proto::Action &action,
-        uint64_t discrete_action_size,
-        uint64_t continuous_action_size) {
-    if (action.done()) {
-        return false;
-    } else if (static_cast<uint64_t>(action.discrete_size()) != discrete_action_size) {
-        std::cout << "received discrete external action of length "
-            << action.discrete_size() << " (need length "
-            << discrete_action_size << ")" << std::endl;
-        return false;
-    } else if (static_cast<uint64_t>(action.continuous_size()) != continuous_action_size) {
-        std::cout << "received continuous external action of length "
-            << action.continuous_size() << " (need length "
-            << continuous_action_size << ")" << std::endl;
-        return false;
-    }
-    return true;
 }
 
 } // namespace autonomy

@@ -42,7 +42,8 @@ class ScrimmageOpenAISensor : public scrimmage::Sensor {
  public:
     EnvParams observation_space;
     ScrimmageOpenAISensor();
-    virtual const EnvValues &get_observations() {return observations;}
+    virtual void get_observation(int* /*data*/, int /*beg_idx*/, int /*end_idx*/) {}
+    virtual void get_observation(double* /*data*/, int /*beg_idx*/, int /*end_idx*/) {}
 
  protected:
     EnvValues observations;

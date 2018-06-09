@@ -50,7 +50,6 @@ class RLSimple : public scrimmage::autonomy::ExternalControl {
     std::pair<bool, double> calc_reward(double t, double dt) override;
 
  protected:
-    double action_getter(bool discrete, int idx);
 
     double radius_;
 

@@ -54,9 +54,8 @@ void RLSimpleSensor::init(std::map<std::string, std::string> &/*params*/) {
     observation_space.continuous_extrema.push_back(std::make_pair(-inf, inf));
 }
 
-const EnvValues &RLSimpleSensor::get_observations() {
-    observations.continuous[0] = parent_->state()->pos()(0);
-    return observations;
+void RLSimpleSensor::get_observation(double *data, int beg_idx, int /*end_idx*/) {
+    data[beg_idx] = parent_->state()->pos()(0);
 }
 
 } // namespace sensor

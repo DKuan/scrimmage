@@ -16,6 +16,8 @@ pybind11_add_module(${LIBRARY_NAME}
 
 target_link_libraries(${LIBRARY_NAME} PRIVATE
   ${PROJECT_PLUGINS}
+  ${VTK_LIBRARIES}
+  scrimmage-viewer
   scrimmage)
 
 message("-----${PROJECT_PLUGINS}")

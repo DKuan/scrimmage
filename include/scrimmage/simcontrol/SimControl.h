@@ -67,6 +67,7 @@ class SimControl {
     void start();
     void display_progress(bool enable);
     void run();
+    bool run_single_step(int loop_number);
     void cleanup();
     bool wait_for_ready();
     void force_exit();
@@ -109,7 +110,7 @@ class SimControl {
     void single_step(bool value);
     bool single_step();
 
-    bool end_condition_reached(double t, double dt);
+    bool end_condition_reached();
 
     Timer &timer();
 

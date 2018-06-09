@@ -110,6 +110,16 @@ SimControl::SimControl() :
 }
 
 bool SimControl::init() {
+    ents_.clear();
+    ent_inters_.clear();
+    metrics_.clear();
+    contacts_->clear();
+    shapes_.clear();
+    contact_visuals_.clear();
+    networks_->clear();
+    pubsub_->pubs().clear();
+    pubsub_->subs().clear();
+
     if (mp_ == NULL) {
         cout << "Mission Parse hasn't been set yet." << endl;
         return false;
@@ -678,6 +688,111 @@ void SimControl::run_remove_inactive() {
     }
 }
 
+bool SimControl::run_single_step(int loop_number) {
+    double t = this->t();
+    reseed_task_.update(t);
+    start_loop_timer();
+
+    if (!generate_entities(t)) {
+        cout << "Failed to generate entity" << endl;
+        return false;
+    }
+
+    if (!wait_for_ready()) {
+        cleanup();
+        return false;
+    }
+
+    create_rtree();
+    set_autonomy_contacts();
+    if (!run_entities()) {
+        if (!limited_verbosity_) {
+            std::cout << "Exiting due to plugin request." << std::endl;
+        }
+        return false;
+    }
+
+    if (!run_interaction_detection()) {
+        auto msg = std::make_shared<Message<sm::EntityInteractionExit>>();
+        pub_ent_int_exit_->publish(msg);
+    }
+
+    // The networks are run before the metrics, so that messages that are
+    // published on the final time stamp can be processed by the metrics.
+    if (!run_networks()) {
+        if (!limited_verbosity_) {
+            std::cout << "Exiting due to network plugin request." << std::endl;
+        }
+        return false;
+    }
+
+    if (!run_metrics()) {
+        if (!limited_verbosity_) {
+            std::cout << "Exiting due to metrics plugin exception" << std::endl;
+        }
+        return false;
+    }
+
+    if (!run_logging()) {
+        if (!limited_verbosity_) {
+            std::cout << "Exiting due to logging exception" << std::endl;
+        }
+        return false;
+    }
+
+    run_remove_inactive();
+    run_send_shapes();
+    run_send_contact_visuals(); // send updated visuals
+
+    if (display_progress_) {
+        if (loop_number % 100 == 0) {
+            sc::display_progress((tend_ == 0) ? 1.0 : t / tend_);
+        }
+    }
+
+    if (screenshot_task_.update(t_).first) {
+        request_screenshot();
+    }
+
+    // Wait loop timer.
+    // Stay in loop if currently paused.
+    bool exit_loop = false;
+    do {
+        loop_wait();
+
+        // Were we told to exit, externally?
+        exit_mutex_.lock();
+        if (exit_) {
+            exit_loop = true;
+        }
+        exit_mutex_.unlock();
+
+        if (single_step()) {
+            single_step(false);
+            take_step_mutex_.lock();
+            take_step_ = true;
+            take_step_mutex_.unlock();
+            pause(prev_paused_);
+            break;
+        }
+
+        run_check_network_msgs();
+
+        scrimmage_proto::SimInfo info;
+        info.set_time(this->t());
+        info.set_desired_warp(this->time_warp());
+        info.set_actual_warp(this->actual_time_warp());
+        info.set_shutting_down(false);
+        outgoing_interface_->send_sim_info(info);
+    } while (paused() && !exit_loop);
+
+    // Increment time and loop counter
+    set_time(t + dt_);
+    prev_paused_ = paused_;
+
+    return !exit_loop;
+}
+
 void SimControl::run() {
     start_overall_timer();
 
@@ -685,125 +800,10 @@ void SimControl::run() {
     int loop_number = 0;
     bool exit_loop = false;
     set_time(t0_);
-    bool end_condition_interaction;
 
-    if (!generate_entities(this->t())) {
-        cout << "Failed to generate entity" << endl;
-        cleanup();
-        return;
-    }
-
-    end_condition_interaction = run_interaction_detection();
-    if (!end_condition_interaction) {
-        auto msg = std::make_shared<Message<sm::EntityInteractionExit>>();
-        pub_ent_int_exit_->publish(msg);
-        cleanup();
-    }
-
-    do {
-        double t = this->t();
-        reseed_task_.update(t);
-        start_loop_timer();
-
-        if (!generate_entities(t)) {
-            cout << "Failed to generate entity" << endl;
-            break;
-        }
-
-        if (!wait_for_ready()) {
-            cleanup();
-            return;
-        }
-
-        create_rtree();
-        set_autonomy_contacts();
-        if (!run_entities()) {
-            if (!limited_verbosity_) {
-                std::cout << "Exiting due to plugin request." << std::endl;
-            }
-            break;
-        }
-
-        end_condition_interaction = run_interaction_detection();
-        if (!end_condition_interaction) {
-            auto msg = std::make_shared<Message<sm::EntityInteractionExit>>();
-            pub_ent_int_exit_->publish(msg);
-        }
-
-        // The networks are run before the metrics, so that messages that are
-        // published on the final time stamp can be processed by the metrics.
-        if (!run_networks()) {
-            if (!limited_verbosity_) {
-                std::cout << "Exiting due to network plugin request." << std::endl;
-            }
-            break;
-        }
-
-        if (!run_metrics()) {
-            if (!limited_verbosity_) {
-                std::cout << "Exiting due to metrics plugin exception" << std::endl;
-            }
-            break;
-        }
-
-        if (!run_logging()) {
-            if (!limited_verbosity_) {
-                std::cout << "Exiting due to logging exception" << std::endl;
-            }
-            break;
-        }
-
-        run_remove_inactive();
-        run_send_shapes();
-        run_send_contact_visuals(); // send updated visuals
-
-        if (display_progress_) {
-            if (loop_number % 100 == 0) {
-                sc::display_progress((tend_ == 0) ? 1.0 : t / tend_);
-            }
-        }
-
-        if (screenshot_task_.update(t_).first) {
-            request_screenshot();
-        }
-
-        // Wait loop timer.
-        // Stay in loop if currently paused.
-        do {
-            loop_wait();
-
-            // Were we told to exit, externally?
-            exit_mutex_.lock();
-            if (exit_) {
-                exit_loop = true;
-            }
-            exit_mutex_.unlock();
-
-            if (single_step()) {
-                single_step(false);
-                take_step_mutex_.lock();
-                take_step_ = true;
-                take_step_mutex_.unlock();
-                pause(prev_paused_);
-                break;
-            }
-
-            run_check_network_msgs();
-
-            scrimmage_proto::SimInfo info;
-            info.set_time(this->t());
-            info.set_desired_warp(this->time_warp());
-            info.set_actual_warp(this->actual_time_warp());
-            info.set_shutting_down(false);
-            outgoing_interface_->send_sim_info(info);
-        } while (paused() && !exit_loop);
-
-        // Increment time and loop counter
-        set_time(t + dt_);
-        loop_number++;
-        prev_paused_ = paused_;
-    } while (end_condition_interaction && !end_condition_reached(t(), dt_) && !exit_loop);
-
+    while (run_single_step(loop_number++) &&
+           !end_condition_reached() &&
+           !exit_loop) {}
     cleanup();
 }
 
@@ -875,9 +875,9 @@ bool SimControl::wait_for_ready() {
     return true;
 }
 
-bool SimControl::end_condition_reached(double t, double dt) {
+bool SimControl::end_condition_reached() {
 
-    if (end_conditions_.count(EndConditionFlags::TIME) &&t > mp_->tend() + dt / 2.0) {
+    if (end_conditions_.count(EndConditionFlags::TIME) && t() > mp_->tend() + dt_ / 2.0) {
         auto msg = std::make_shared<Message<sm::EndTime>>();
         pub_end_time_->publish(msg);
         return true;

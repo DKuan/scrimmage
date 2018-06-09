@@ -71,7 +71,7 @@ void RLSimple::init(std::map<std::string, std::string> &params) {
     ExternalControl::init(params);
 
     if (x_discrete_) {
-        action_space.discrete_maxima.push_back(1);
+        action_space.discrete_count.push_back(2);
     } else {
         const double inf = std::numeric_limits<double>::infinity();
         action_space.continuous_extrema.push_back(std::make_pair(-inf, inf));
@@ -79,7 +79,7 @@ void RLSimple::init(std::map<std::string, std::string> &params) {
 
     if (ctrl_y_) {
         if (y_discrete_) {
-            action_space.discrete_maxima.push_back(1);
+            action_space.discrete_count.push_back(2);
         } else {
             const double inf = std::numeric_limits<double>::infinity();
             action_space.continuous_extrema.push_back(std::make_pair(-inf, inf));
@@ -87,7 +87,7 @@ void RLSimple::init(std::map<std::string, std::string> &params) {
     }
 }
 
-std::pair<bool, double> RLSimple::calc_reward(double t, double dt) {
+std::pair<bool, double> RLSimple::calc_reward(double /*t*/, double /*dt*/) {
     const bool done = false;
     const double x = state_->pos()(0);
     const bool within_radius = std::round(std::abs(x)) < radius_;
@@ -95,24 +95,21 @@ std::pair<bool, double> RLSimple::calc_reward(double t, double dt) {
     return {done, reward};
 }
 
-double RLSimple::action_getter(bool discrete, int idx) {
-    if (discrete) {
-        return action_.discrete(idx) ? 1 : -1;
-    } else {
-        return action_.continuous(idx);
-    }
-}
-
 bool RLSimple::step_autonomy(double /*t*/, double /*dt*/) {
-    if (action_.done()) return false;
+    // cppcheck-suppress variableScope
+    int disc_idx = 0;
+    // cppcheck-suppress variableScope
+    int cont_idx = 0;
+    auto getter = [&](auto discrete) -> double {
+        if (discrete) {
+            return action.discrete[disc_idx++] ? 1 : -1;
+        } else {
+            return action.continuous[cont_idx++];
+        }
+    };
 
-    int num_discrete = x_discrete_ + (ctrl_y_ && y_discrete_);
-    int num_continuous = !x_discrete_ + (ctrl_y_ && !y_discrete_);
-
-    if (!check_action(action_, num_discrete, num_continuous)) return false;
-
-    double x_vel = action_getter(x_discrete_, 0);
-    double y_vel = ctrl_y_ ? action_getter(y_discrete_, 1) : 0;
+    const double x_vel = getter(x_discrete_);
+    const double y_vel = ctrl_y_ ? getter(y_discrete_) : 0;
 
     vars_.output(output_vel_x_idx_, x_vel);
     vars_.output(output_vel_y_idx_, y_vel);

@@ -45,7 +45,7 @@ namespace sensor {
 class RLSimpleSensor : public ScrimmageOpenAISensor {
  public:
     void init(std::map<std::string, std::string> &params) override;
-    const EnvValues &get_observations() override;
+    void get_observation(double *data, int beg_idx, int end_idx) override;
 };
 
 } // namespace sensor
