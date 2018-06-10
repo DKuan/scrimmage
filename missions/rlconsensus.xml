@@ -21,7 +21,7 @@
 
   <plot_tracks>false</plot_tracks>
   <output_type>nothing</output_type>
-  <display_progress>true</display_progress>
+  <display_progress>false</display_progress>
   <show_plugins>false</show_plugins>
 
   <log_dir>~/.scrimmage/logs</log_dir>
@@ -60,7 +60,7 @@
   </entity_common>
 
   <entity entity_common="all">
-    <count>1</count>
+    <count>2</count>
     <x>0</x>
     <variance_x>5</variance_x>
     <color>77 77 255</color>

@@ -60,19 +60,19 @@ void RLConsensus::init(std::map<std::string, std::string> &params) {
 
 void RLConsensus::set_environment() {
     RLSimple::set_environment();
-    const int num_veh = contacts_->size();
-    reward_range = std::make_pair(0, num_veh / parent_->mp()->tend());
+    reward_range = std::make_pair(0, 1 / parent_->mp()->tend());
 }
 
 std::pair<bool, double> RLConsensus::calc_reward(double /*t*/, double /*dt*/) {
     const bool done = false;
-    double x = state_->pos()(0);
+    const double x = state_->pos()(0);
     auto dist = [&](auto &kv) {return std::abs(kv.second.state()->pos()(0) - x);};
     auto close = [&](double d) {return std::abs(d) < radius_;};
 
+    const int num_veh = contacts_->size();
     const int num_close = br::count_if(*contacts_ | ba::transformed(dist), close) - 1;
 
-    const double reward = num_close / parent_->mp()->tend();
+    const double reward = num_close / (num_veh * parent_->mp()->tend());
     return {done, reward};
 }
 
