@@ -82,10 +82,6 @@ ScrimmageOpenAIEnv::ScrimmageOpenAIEnv(
     mp_ = std::make_shared<sc::MissionParse>();
     reset_scrimmage(false);
 
-    reward_range = pybind11::tuple(2);
-    set_reward_range();
-    create_action_space();
-
     tuple_space_ = get_gym_space("Tuple");
     discrete_space_ = get_gym_space("Discrete");
     multidiscrete_space_ = get_gym_space("MultiDiscrete");
@@ -116,9 +112,10 @@ void ScrimmageOpenAIEnv::create_action_space() {
         py::list continuous_minima;
         py::list continuous_maxima;
 
-        for (auto &autonomy : ext_ctrl_vec_) {
-            to_discrete(autonomy->action_space.discrete_count, discrete_count);
-            to_continuous(autonomy->action_space.continuous_extrema, continuous_minima, continuous_maxima);
+        for (auto &a : ext_ctrl_vec_) {
+            a->set_environment();
+            to_discrete(a->action_space.discrete_count, discrete_count);
+            to_continuous(a->action_space.continuous_extrema, continuous_minima, continuous_maxima);
         }
 
         action_space =
@@ -128,13 +125,14 @@ void ScrimmageOpenAIEnv::create_action_space() {
 
         py::list action_spaces;
 
-        for (auto &autonomy : ext_ctrl_vec_) {
+        for (auto &a : ext_ctrl_vec_) {
             py::list discrete_count;
             py::list continuous_minima;
             py::list continuous_maxima;
 
-            to_discrete(autonomy->action_space.discrete_count, discrete_count);
-            to_continuous(autonomy->action_space.continuous_extrema, continuous_minima, continuous_maxima);
+            a->set_environment();
+            to_discrete(a->action_space.discrete_count, discrete_count);
+            to_continuous(a->action_space.continuous_extrema, continuous_minima, continuous_maxima);
 
             auto space =
                 create_space(discrete_count, continuous_minima, continuous_maxima);
@@ -216,6 +214,7 @@ void ScrimmageOpenAIEnv::create_observation_space() {
 }
 
 void ScrimmageOpenAIEnv::set_reward_range() {
+    reward_range = pybind11::tuple(2);
     if (ext_ctrl_vec_.size() == 1) {
         reward_range[0] = ext_ctrl_vec_[0]->reward_range.first;
         reward_range[1] = ext_ctrl_vec_[0]->reward_range.second;
@@ -395,6 +394,8 @@ void ScrimmageOpenAIEnv::reset_scrimmage(bool enable_gui) {
         mp_->set_time_warp(0);
     }
     log_ = sc::preprocess_scrimmage(mp_, simcontrol_);
+    simcontrol_.start_overall_timer();
+    simcontrol_.set_time(mp_->t0());
     if (enable_gui) {
         simcontrol_.pause(true);
     } else {
@@ -429,6 +430,8 @@ void ScrimmageOpenAIEnv::reset_scrimmage(bool enable_gui) {
         }
     }
     create_observation_space();
+    create_action_space();
+    set_reward_range();
 }
 
 void ScrimmageOpenAIEnv::run_viewer() {
@@ -458,7 +461,9 @@ pybind11::tuple ScrimmageOpenAIEnv::step(pybind11::object action) {
 
     distribute_action(action);
 
-    bool done = !simcontrol_.run_single_step(loop_number_++);
+    bool done = !simcontrol_.run_single_step(loop_number_++) ||
+        simcontrol_.end_condition_reached();
+
     update_observation();
 
     py::float_ py_reward;

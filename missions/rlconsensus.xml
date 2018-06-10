@@ -20,7 +20,7 @@
   <gui_update_period>10</gui_update_period> 
 
   <plot_tracks>false</plot_tracks>
-  <output_type></output_type>
+  <output_type>nothing</output_type>
   <display_progress>true</display_progress>
   <show_plugins>false</show_plugins>
 
@@ -60,7 +60,7 @@
   </entity_common>
 
   <entity entity_common="all">
-    <count>2</count>
+    <count>1</count>
     <x>0</x>
     <variance_x>5</variance_x>
     <color>77 77 255</color>

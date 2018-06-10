@@ -45,6 +45,7 @@ namespace autonomy {
 class RLConsensus : public scrimmage::autonomy::RLSimple {
  public:
     void init(std::map<std::string, std::string> &params) override;
+    void set_environment() override;
     std::pair<bool, double> calc_reward(double t, double dt) override;
 };
 } // namespace autonomy

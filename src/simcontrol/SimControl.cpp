@@ -798,12 +798,9 @@ void SimControl::run() {
 
     // Simulate over the time range
     int loop_number = 0;
-    bool exit_loop = false;
     set_time(t0_);
 
-    while (run_single_step(loop_number++) &&
-           !end_condition_reached() &&
-           !exit_loop) {}
+    while (run_single_step(loop_number++) && !end_condition_reached()) {}
     cleanup();
 }
 
@@ -877,7 +874,7 @@ bool SimControl::wait_for_ready() {
 
 bool SimControl::end_condition_reached() {
 
-    if (end_conditions_.count(EndConditionFlags::TIME) && t() > mp_->tend() + dt_ / 2.0) {
+    if (end_conditions_.count(EndConditionFlags::TIME) && t() > mp_->tend() - dt_ / 2.0) {
         auto msg = std::make_shared<Message<sm::EndTime>>();
         pub_end_time_->publish(msg);
         return true;

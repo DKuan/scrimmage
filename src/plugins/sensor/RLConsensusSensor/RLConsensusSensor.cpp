@@ -64,47 +64,17 @@ void RLConsensusSensor::set_observation_space() {
 
 void RLConsensusSensor::get_observation(double *data, uint32_t beg_idx, uint32_t end_idx) {
     auto c = parent_->contacts();
+    if (c->size() != end_idx - beg_idx) {
+        std::cout << "RLConsensusSensor::get_observation (end_idx - beg_idx) "
+            << "does not match number of vehicles" << std::endl;
+        return;
+    }
+
     auto ids_view = *c | ba::map_keys;
     std::set<int> ids(ids_view.begin(), ids_view.end());
 
     auto get_x = [&](int id) {return c->at(id).state()->pos()(0);};
-    if (c->size() == end_idx - beg_idx) {
-        br::copy(ids | ba::transformed(get_x), data);
-    } else {
-        std::cout << "RLConsensusSensor::get_observation (end_idx - beg_idx) "
-            << "does not match number of vehicles" << std::endl;
-    }
+    br::copy(ids | ba::transformed(get_x), data);
 }
-
-// scrimmage::MessagePtr<scrimmage_proto::SpaceSample>
-// RLConsensusSensor::sensor_msg_flat(double /*t*/) {
-//     auto msg = std::make_shared<sc::Message<sp::SpaceSample>>();
-// 
-//     // order contacts
-//     auto ids_view = *parent_->contacts() | ba::map_keys;
-//     std::set<int> ids(ids_view.begin(), ids_view.end());
-// 
-//     msg->data.add_value(parent_->id().id() - 1);
-//     for (int id : ids) {
-//         msg->data.add_value(parent_->contacts()->at(id).state()->pos()(0));
-//     }
-//     return msg;
-// }
-// 
-// scrimmage_proto::SpaceParams RLConsensusSensor::observation_space_params() {
-//     sp::SpaceParams space_params;
-// 
-//     const int num_neigh = parent_->contacts()->size();
-//     const double inf = std::numeric_limits<double>::infinity();
-// 
-//     sp::SingleSpaceParams *single_space_params = space_params.add_params();
-//     single_space_params->set_num_dims(1 + num_neigh);
-//     single_space_params->add_minimum(-inf);
-//     single_space_params->add_maximum(inf);
-//     single_space_params->set_discrete(false);
-// 
-//     return space_params;
-// }
-
 } // namespace sensor
 } // namespace scrimmage

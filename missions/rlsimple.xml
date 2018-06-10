@@ -6,7 +6,7 @@
     network_gui="false"
     start="0.0"
     start_paused="true"
-    time_warp="10" />
+    time_warp="0" />
 
   <stream_port>50051</stream_port>
   <stream_ip>localhost</stream_ip>
@@ -21,7 +21,7 @@
 
   <plot_tracks>false</plot_tracks>
   <output_type>nothing</output_type>
-  <display_progress>true</display_progress>
+  <display_progress>false</display_progress>
   <show_plugins>false</show_plugins>
 
   <log_dir>~/.scrimmage/logs</log_dir>

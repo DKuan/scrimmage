@@ -70,6 +70,11 @@ void RLSimple::init(std::map<std::string, std::string> &params) {
 
     ExternalControl::init(params);
 
+}
+
+void RLSimple::set_environment() {
+    reward_range = std::make_pair(0, 1);
+
     if (x_discrete_) {
         action_space.discrete_count.push_back(2);
     } else {
@@ -92,7 +97,7 @@ std::pair<bool, double> RLSimple::calc_reward(double /*t*/, double /*dt*/) {
     const double x = state_->pos()(0);
     const bool within_radius = std::round(std::abs(x)) < radius_;
     double reward = within_radius ? 1 : 0;
-    return {done, reward};
+    return {done, reward / 100.0};
 }
 
 bool RLSimple::step_autonomy(double /*t*/, double /*dt*/) {

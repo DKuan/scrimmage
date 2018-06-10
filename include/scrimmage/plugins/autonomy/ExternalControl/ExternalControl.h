@@ -65,6 +65,7 @@ class ExternalControl : public scrimmage::Autonomy {
     bool step_autonomy(double t, double dt) override;
 
     // additional override
+    virtual void set_environment() {}
     virtual std::pair<bool, double> calc_reward(double t, double dt);
     std::pair<double, double> reward_range;
     EnvParams action_space;

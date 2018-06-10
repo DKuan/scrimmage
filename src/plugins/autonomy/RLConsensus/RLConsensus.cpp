@@ -31,7 +31,9 @@
  */
 
 #include <scrimmage/entity/Contact.h>
+#include <scrimmage/entity/Entity.h>
 #include <scrimmage/math/State.h>
+#include <scrimmage/parse/MissionParse.h>
 #include <scrimmage/parse/ParseUtils.h>
 #include <scrimmage/plugin_manager/RegisterPlugin.h>
 #include <scrimmage/proto/ExternalControl.pb.h>
@@ -41,9 +43,11 @@
 #include <iostream>
 
 #include <boost/range/algorithm/count_if.hpp>
+#include <boost/range/adaptor/transformed.hpp>
 
 namespace sp = scrimmage_proto;
 namespace br = boost::range;
+namespace ba = boost::adaptors;
 
 REGISTER_PLUGIN(scrimmage::Autonomy, scrimmage::autonomy::RLConsensus, RLConsensus_plugin)
 
@@ -52,19 +56,23 @@ namespace autonomy {
 
 void RLConsensus::init(std::map<std::string, std::string> &params) {
     RLSimple::init(params);
-    reward_range = std::make_pair(-1, 1);
+}
+
+void RLConsensus::set_environment() {
+    RLSimple::set_environment();
+    const int num_veh = contacts_->size();
+    reward_range = std::make_pair(0, num_veh / parent_->mp()->tend());
 }
 
 std::pair<bool, double> RLConsensus::calc_reward(double /*t*/, double /*dt*/) {
     const bool done = false;
-    double reward = 0;
     double x = state_->pos()(0);
-    // auto close = [&](auto &kv) {
-    //     return std::round(std::abs(kv.second.state()->pos()(0) - x)) < radius_;
-    // };
-    // reward = (br::count_if(*contacts_, close) - 1) / 100.0;
+    auto dist = [&](auto &kv) {return std::abs(kv.second.state()->pos()(0) - x);};
+    auto close = [&](double d) {return std::abs(d) < radius_;};
 
-    reward = static_cast<double>(std::abs(x) < radius_) / 100.0;
+    const int num_close = br::count_if(*contacts_ | ba::transformed(dist), close) - 1;
+
+    const double reward = num_close / parent_->mp()->tend();
     return {done, reward};
 }
 

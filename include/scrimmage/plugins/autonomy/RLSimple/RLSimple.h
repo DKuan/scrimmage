@@ -47,6 +47,7 @@ class RLSimple : public scrimmage::autonomy::ExternalControl {
     void init(std::map<std::string, std::string> &params) override;
     bool step_autonomy(double t, double dt) override;
 
+    void set_environment() override;
     std::pair<bool, double> calc_reward(double t, double dt) override;
 
  protected:

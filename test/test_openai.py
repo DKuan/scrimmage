@@ -61,12 +61,12 @@ def _run_test(version, combine_actors, get_action):
     # the observation is the state of the aircraft
     obs = []
 
-    obs.append(copy.deepcopy(env.reset()))
+    obs.append(np.copy(env.reset()))
     total_reward = 0
     for i in range(1000):
         action = get_action(i)
         temp_obs, reward, done = env.step(action)[:3]
-        obs.append(copy.deepcopy(temp_obs))
+        obs.append(np.copy(temp_obs))
         try:
             total_reward += sum(reward)
         except TypeError:
@@ -99,32 +99,6 @@ def _write_temp_mission(x_discrete, ctrl_y, y_discrete, num_actors, end):
         root.append(entity_node2)
 
     tree.write(TEMP_MISSION_FILE)
-
-
-class TimeoutError(Exception):
-    """Implementation in case python 2 is used."""
-    pass
-
-
-class Timeout:
-    """Run an operation and raise TimeoutError if it takes too long.
-
-    see https://stackoverflow.com/a/22348885
-    """
-
-    def __init__(self, seconds=1, error_message='Timeout'):
-        self.seconds = seconds
-        self.error_message = error_message
-
-    def handle_timeout(self, signum, frame):
-        raise TimeoutError(self.error_message)
-
-    def __enter__(self):
-        signal.signal(signal.SIGALRM, self.handle_timeout)
-        signal.alarm(self.seconds)
-
-    def __exit__(self, type, value, traceback):
-        signal.alarm(0)
 
 
 def test_one_dim_discrete():
@@ -227,12 +201,11 @@ def test_sim_end():
 
     VERSION = 'scrimmage-v0'
     _write_temp_mission(x_discrete=True, ctrl_y=False, y_discrete=True,
-                        num_actors=1, end=0.2)
+                        num_actors=1, end=2)
     combine_actors = False
 
-    # basically tests to make sure the simulation does not hang
-    with Timeout(seconds=10):
-        _run_test(VERSION, combine_actors, _get_action)
+    obs = _run_test(VERSION, combine_actors, _get_action)[1]
+    assert len(obs) == 3
 
 
 if __name__ == '__main__':
