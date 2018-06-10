@@ -173,11 +173,18 @@ void ScrimmageOpenAIEnv::create_observation_space() {
         py::list continuous_minima;
         py::list continuous_maxima;
 
+        bool done = false;
         for (auto &v : ext_sensor_vec_) {
+            if (done) break;
             for (auto &s : v) {
                 s->set_observation_space();
                 to_discrete(s->observation_space.discrete_count, discrete_count);
                 to_continuous(s->observation_space.continuous_extrema, continuous_minima, continuous_maxima);
+
+                if (global_sensor_) {
+                    done = true;
+                    break;
+                }
             }
         }
 
@@ -279,7 +286,7 @@ pybind11::object ScrimmageOpenAIEnv::create_space(
     }
 }
 
-void ScrimmageOpenAIEnv::render() {
+void ScrimmageOpenAIEnv::render(const std::string &mode) {
     warning_function_("render must be set in gym.make with enable_gui kwargs");
 }
 
@@ -319,11 +326,18 @@ void ScrimmageOpenAIEnv::update_observation() {
         int* r_disc = static_cast<int *>(disc_obs.request().ptr);
         double* r_cont = static_cast<double *>(cont_obs.request().ptr);
 
+        bool done = false;
         for (auto &v : ext_sensor_vec_) {
+            if (done) break;
             for (auto &s : v) {
                 auto obs_space = s->observation_space;
                 call_get_obs(r_disc, disc_beg_idx, s, obs_space.discrete_count.size());
                 call_get_obs(r_cont, cont_beg_idx, s, obs_space.continuous_extrema.size());
+
+                if (global_sensor_) {
+                    done = true;
+                    break;
+                }
             }
         }
 
@@ -367,6 +381,7 @@ pybind11::object ScrimmageOpenAIEnv::reset() {
     shutdown_handler = [&](int /*s*/){
         std::cout << std::endl << "Exiting gracefully" << std::endl;
         simcontrol_.force_exit();
+        system("pkill scrimmage-viz");
         throw std::exception();
     };
     sa.sa_handler = signal_handler;
@@ -451,6 +466,7 @@ void ScrimmageOpenAIEnv::run_viewer() {
 void ScrimmageOpenAIEnv::close() {
     simcontrol_.cleanup();
     postprocess_scrimmage(mp_, simcontrol_, log_);
+    system("pkill scrimmage-viz");
 }
 
 void ScrimmageOpenAIEnv::seed(pybind11::object _seed) {
@@ -591,6 +607,7 @@ void add_openai_env(pybind11::module &m) {
         .def("reset", &ScrimmageOpenAIEnv::reset)
         .def("close", &ScrimmageOpenAIEnv::close)
         .def("seed", &ScrimmageOpenAIEnv::seed)
-        .def("render", &ScrimmageOpenAIEnv::render)
+        .def("render", &ScrimmageOpenAIEnv::render,
+            py::arg("mode") = "human")
         .def_property_readonly("unwrapped", &ScrimmageOpenAIEnv::get_this);
 }

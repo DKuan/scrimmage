@@ -43,7 +43,7 @@ MISSION_FILE = 'rlsimple.xml'
 TEMP_MISSION_FILE = '.rlsimple.xml'
 
 
-def _run_test(version, combine_actors, get_action):
+def _run_test(version, combine_actors, global_sensor, get_action):
     try:
         env = gym.make(version)
     except gym.error.Error:
@@ -54,6 +54,7 @@ def _run_test(version, combine_actors, get_action):
             reward_threshold=1e9,
             kwargs={"enable_gui": False,
                     "combine_actors": combine_actors,
+                    "global_sensor": global_sensor,
                     "mission_file": TEMP_MISSION_FILE}
         )
         env = gym.make(version)
@@ -110,7 +111,9 @@ def test_one_dim_discrete():
     _write_temp_mission(x_discrete=True, ctrl_y=False, y_discrete=True,
                         num_actors=1, end=1000)
     combine_actors = False
-    env, obs, total_reward = _run_test(VERSION, combine_actors, _get_action)
+    global_sensor = False
+    env, obs, total_reward = \
+        _run_test(VERSION, combine_actors, global_sensor, _get_action)
 
     assert len(obs[0]) == 1
     assert obs[0][0] == 0
@@ -129,7 +132,9 @@ def test_two_dim_discrete():
     _write_temp_mission(x_discrete=True, ctrl_y=True, y_discrete=True,
                         num_actors=1, end=1000)
     combine_actors = False
-    env, obs, total_reward = _run_test(VERSION, combine_actors, _get_action)
+    global_sensor = False
+    env, obs, total_reward = \
+        _run_test(VERSION, combine_actors, global_sensor, _get_action)
 
     assert len(obs[0]) == 1
     assert obs[0] == 0
@@ -148,7 +153,9 @@ def test_one_dim_continuous():
     _write_temp_mission(x_discrete=False, ctrl_y=False, y_discrete=False,
                         num_actors=1, end=1000)
     combine_actors = False
-    env, obs, total_reward = _run_test(VERSION, combine_actors, _get_action)
+    global_sensor = False
+    env, obs, total_reward = \
+        _run_test(VERSION, combine_actors, global_sensor, _get_action)
 
     assert len(obs[0]) == 1
     assert obs[0] == 0
@@ -166,7 +173,9 @@ def test_two_combined_veh_dim_discrete():
     _write_temp_mission(x_discrete=True, ctrl_y=False, y_discrete=False,
                         num_actors=2, end=1000)
     combine_actors = True
-    env, obs, total_reward = _run_test(VERSION, combine_actors, _get_action)
+    global_sensor = False
+    env, obs, total_reward = \
+        _run_test(VERSION, combine_actors, global_sensor, _get_action)
 
     assert len(obs[0]) == 2
     assert np.array_equal(obs[0], np.array([0., 0.]))
@@ -184,13 +193,35 @@ def test_two_not_combined_veh_dim_discrete():
     _write_temp_mission(x_discrete=True, ctrl_y=False, y_discrete=False,
                         num_actors=2, end=1000)
     combine_actors = False
-    env, obs, total_reward = _run_test(VERSION, combine_actors, _get_action)
+    global_sensor = False
+    env, obs, total_reward = \
+        _run_test(VERSION, combine_actors, global_sensor, _get_action)
 
     assert len(obs[0]) == 2
     assert obs[0][0] == 0
     assert obs[0][1] == 0
     assert isinstance(env.action_space, gym.spaces.Tuple)
     assert isinstance(env.observation_space, gym.spaces.Tuple)
+    assert total_reward == 8
+
+
+def test_two_combined_veh_dim_discrete_global_sensor():
+    """Open single entity scenario and make sure it banks."""
+    def _get_action(i):
+        return [1, 0] if i < 100 else [0, 1]
+
+    VERSION = 'scrimmage-v5'
+    _write_temp_mission(x_discrete=True, ctrl_y=False, y_discrete=False,
+                        num_actors=2, end=1000)
+    combine_actors = True
+    global_sensor = True
+    env, obs, total_reward = \
+        _run_test(VERSION, combine_actors, global_sensor, _get_action)
+
+    assert len(obs[0]) == 1
+    assert np.array_equal(obs[0], np.array([0.]))
+    assert isinstance(env.action_space, gym.spaces.MultiDiscrete)
+    assert isinstance(env.observation_space, gym.spaces.Box)
     assert total_reward == 8
 
 
@@ -203,8 +234,8 @@ def test_sim_end():
     _write_temp_mission(x_discrete=True, ctrl_y=False, y_discrete=True,
                         num_actors=1, end=2)
     combine_actors = False
-
-    obs = _run_test(VERSION, combine_actors, _get_action)[1]
+    global_sensor = False
+    obs = _run_test(VERSION, combine_actors, global_sensor, _get_action)[1]
     assert len(obs) == 3
 
 
@@ -215,3 +246,4 @@ if __name__ == '__main__':
     test_two_combined_veh_dim_discrete()
     test_two_not_combined_veh_dim_discrete()
     test_sim_end()
+    test_two_combined_veh_dim_discrete_global_sensor()

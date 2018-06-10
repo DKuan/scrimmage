@@ -57,7 +57,7 @@ class ScrimmageOpenAIEnv {
     pybind11::object reset();
 
     void close();
-    void render();
+    void render(const std::string &mode = "human");
     void seed(pybind11::object _seed = pybind11::none());
     ScrimmageOpenAIEnv *get_this() {return this;}
 

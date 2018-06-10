@@ -97,7 +97,7 @@ std::pair<bool, double> RLSimple::calc_reward(double /*t*/, double /*dt*/) {
     const double x = state_->pos()(0);
     const bool within_radius = std::round(std::abs(x)) < radius_;
     double reward = within_radius ? 1 : 0;
-    return {done, reward / 100.0};
+    return {done, reward};
 }
 
 bool RLSimple::step_autonomy(double /*t*/, double /*dt*/) {
