@@ -106,6 +106,7 @@ class SimControl {
     bool paused();
     double time_warp();
     double actual_time_warp();
+    void close();
 
     void single_step(bool value);
     bool single_step();

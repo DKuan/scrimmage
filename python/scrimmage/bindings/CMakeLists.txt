@@ -20,7 +20,6 @@ target_link_libraries(${LIBRARY_NAME} PRIVATE
   scrimmage-viewer
   scrimmage)
 
-message("-----${PROJECT_PLUGINS}")
 # Push up the SCRIMMAGE_LIBS variable
 set_target_properties(${LIBRARY_NAME} PROPERTIES
   SUFFIX ".so"

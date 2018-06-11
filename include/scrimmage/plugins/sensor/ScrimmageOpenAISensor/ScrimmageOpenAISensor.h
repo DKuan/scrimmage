@@ -45,9 +45,6 @@ class ScrimmageOpenAISensor : public scrimmage::Sensor {
     virtual void set_observation_space() {}
     virtual void get_observation(int* /*data*/, uint32_t /*beg_idx*/, uint32_t /*end_idx*/) {}
     virtual void get_observation(double* /*data*/, uint32_t /*beg_idx*/, uint32_t /*end_idx*/) {}
-
- protected:
-    EnvValues observations;
 };
 } // namespace sensor
 } // namespace scrimmage

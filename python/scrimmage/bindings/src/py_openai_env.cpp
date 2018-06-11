@@ -38,6 +38,17 @@
 #include <scrimmage/simcontrol/SimUtils.h>
 #include <scrimmage/viewer/Viewer.h>
 
+// temporary includes for scrimmage_memory_cleanup
+#include <scrimmage/motion/MotionModel.h>
+#include <scrimmage/motion/Controller.h>
+#include <scrimmage/math/State.h>
+#include <scrimmage/entity/Contact.h>
+#include <scrimmage/plugin_manager/PluginManager.h>
+#include <scrimmage/common/RTree.h>
+#include <scrimmage/common/Time.h>
+#include <scrimmage/common/Random.h>
+#include <scrimmage/log/Log.h>
+
 #include <pybind11/pybind11.h>
 #include <pybind11/numpy.h>
 
@@ -45,13 +56,15 @@
 #include <algorithm>
 #include <limits>
 #include <exception>
-#include <chrono>
+#include <chrono> // NOLINT
 
 #include <boost/optional.hpp>
 #include <boost/range/numeric.hpp>
 #include <boost/range/adaptor/transformed.hpp>
 #include <boost/range/adaptor/map.hpp>
 #include <boost/range/algorithm/min_element.hpp>
+
+#include <GeographicLib/LocalCartesian.hpp>
 
 namespace py = pybind11;
 namespace sc = scrimmage;
@@ -68,13 +81,16 @@ ScrimmageOpenAIEnv::ScrimmageOpenAIEnv(
         const std::string &mission_file,
         bool enable_gui,
         bool combine_actors,
-        bool global_sensor) :
+        bool global_sensor,
+        double timestep) :
     spec(py::none()),
     metadata(py::dict()),
     mission_file_(mission_file),
     combine_actors_(combine_actors),
     global_sensor_(global_sensor),
     enable_gui_(enable_gui) {
+
+    delayed_task_.delay = timestep;
 
     py::module warnings_module = py::module::import("warnings");
     warning_function_ = warnings_module.attr("warn");
@@ -286,7 +302,7 @@ pybind11::object ScrimmageOpenAIEnv::create_space(
     }
 }
 
-void ScrimmageOpenAIEnv::render(const std::string &mode) {
+void ScrimmageOpenAIEnv::render(const std::string &/*mode*/) {
     warning_function_("render must be set in gym.make with enable_gui kwargs");
 }
 
@@ -380,7 +396,7 @@ pybind11::object ScrimmageOpenAIEnv::reset() {
     memset( &sa, 0, sizeof(sa) );
     shutdown_handler = [&](int /*s*/){
         std::cout << std::endl << "Exiting gracefully" << std::endl;
-        simcontrol_.force_exit();
+        simcontrol_->force_exit();
         system("pkill scrimmage-viz");
         throw std::exception();
     };
@@ -394,9 +410,81 @@ pybind11::object ScrimmageOpenAIEnv::reset() {
     return observation;
 }
 
+void ScrimmageOpenAIEnv::scrimmage_memory_cleanup() {
+    // temporary fix until scrimmage uses weak pointers
+    ext_ctrl_vec_.clear();
+    ext_sensor_vec_.clear();
+
+    if (!simcontrol_) return;
+
+    for (auto e : simcontrol_->ents()) {
+        auto s = std::make_shared<sc::State>();
+        if (e->motion()) {
+            e->motion()->set_state(s);
+            e->motion()->set_parent(nullptr);
+            e->motion()->set_pubsub(nullptr);
+            e->motion()->set_time(std::make_shared<sc::Time>());
+        }
+
+        for (auto &kv : e->sensors()) {
+            kv.second->set_parent(nullptr);
+            kv.second->set_pubsub(nullptr);
+            kv.second->set_time(std::make_shared<sc::Time>());
+        }
+
+        if (e->controller()) {
+            e->controller()->set_parent(nullptr);
+            e->controller()->set_time(std::make_shared<sc::Time>());
+            e->controller()->set_pubsub(nullptr);
+            auto ds = std::make_shared<sc::State>();
+            e->controller()->set_desired_state(ds);
+        }
+
+        for (auto a : e->autonomies()) {
+            auto r = std::make_shared<sc::RTree>();
+            a->set_rtree(r);
+            a->set_parent(nullptr);
+            auto p = std::make_shared<GeographicLib::LocalCartesian>();
+            a->set_projection(p);
+            a->set_pubsub(nullptr);
+            a->set_time(std::make_shared<sc::Time>());
+            auto s = std::make_shared<sc::State>();
+            a->set_state(s);
+            auto ds = std::make_shared<sc::State>();
+            a->set_desired_state(ds);
+            auto c = std::make_shared<sc::ContactMap>();
+            a->set_contacts(c);
+        }
+
+        e->autonomies().clear();
+        e->motion() = nullptr;
+        e->controller() = nullptr;
+        e->set_mp(nullptr);
+        e->state() = nullptr;
+        e->contacts() = nullptr;
+        e->plugin_manager() = nullptr;
+        e->file_search() = nullptr;
+        e->pubsub() = nullptr;
+        e->rtree() = nullptr;
+        e->set_time_ptr(nullptr);
+        e->set_random(nullptr);
+        e->contact_visual() = nullptr;
+        e->sensors().clear();
+        e->services().clear();
+        e->properties().clear();
+        e->set_projection(nullptr);
+    }
+}
+
 void ScrimmageOpenAIEnv::reset_scrimmage(bool enable_gui) {
+    scrimmage_memory_cleanup();
+    mp_ = std::make_shared<sc::MissionParse>();
+    simcontrol_ = std::make_shared<sc::SimControl>();
     if (!mp_->parse(mission_file_)) {
         std::cout << "Failed to parse file: " << mission_file_ << std::endl;
+    }
+    if (seed_set_) {
+        mp_->params()["seed"] = std::to_string(seed_);
     }
     if (enable_gui) {
         mp_->set_network_gui(true);
@@ -408,25 +496,26 @@ void ScrimmageOpenAIEnv::reset_scrimmage(bool enable_gui) {
     } else {
         mp_->set_time_warp(0);
     }
-    log_ = sc::preprocess_scrimmage(mp_, simcontrol_);
-    simcontrol_.start_overall_timer();
-    simcontrol_.set_time(mp_->t0());
+    log_ = sc::preprocess_scrimmage(mp_, *simcontrol_);
+    simcontrol_->start_overall_timer();
+    simcontrol_->set_time(mp_->t0());
     if (enable_gui) {
-        simcontrol_.pause(true);
+        simcontrol_->pause(true);
     } else {
-        simcontrol_.pause(false);
+        simcontrol_->pause(false);
     }
+    delayed_task_.last_updated_time = -std::numeric_limits<double>::infinity();
     if (log_ == nullptr) {
         py::print("scrimmage initialization unsuccessful");
     }
     loop_number_ = 0;
-    if (!simcontrol_.generate_entities(0)) {
+    if (!simcontrol_->generate_entities(0)) {
         py::print("scrimmage entity generation unsuccessful");
     }
 
     ext_ctrl_vec_.clear();
     ext_sensor_vec_.clear();
-    for (auto &e : simcontrol_.ents()) {
+    for (auto &e : simcontrol_->ents()) {
         for (auto &a : e->autonomies()) {
             auto a_cast = std::dynamic_pointer_cast<sc::autonomy::ExternalControl>(a);
             if (a_cast) {
@@ -453,8 +542,8 @@ void ScrimmageOpenAIEnv::run_viewer() {
     py::print("running viewer");
     scrimmage::Viewer viewer;
 
-    auto outgoing = simcontrol_.outgoing_interface();
-    auto incoming = simcontrol_.incoming_interface();
+    auto outgoing = simcontrol_->outgoing_interface();
+    auto incoming = simcontrol_->incoming_interface();
 
     viewer.set_incoming_interface(outgoing);
     viewer.set_outgoing_interface(incoming);
@@ -464,21 +553,26 @@ void ScrimmageOpenAIEnv::run_viewer() {
 }
 
 void ScrimmageOpenAIEnv::close() {
-    simcontrol_.cleanup();
-    postprocess_scrimmage(mp_, simcontrol_, log_);
+    postprocess_scrimmage(mp_, *simcontrol_, log_);
     system("pkill scrimmage-viz");
 }
 
 void ScrimmageOpenAIEnv::seed(pybind11::object _seed) {
-    mp_->params()["seed"] = _seed.cast<int>();
+    seed_set_ = true;
+    seed_ = _seed.cast<int>();
 }
 
 pybind11::tuple ScrimmageOpenAIEnv::step(pybind11::object action) {
 
     distribute_action(action);
 
-    bool done = !simcontrol_.run_single_step(loop_number_++) ||
-        simcontrol_.end_condition_reached();
+    delayed_task_.update(simcontrol_->t());
+    bool done = !simcontrol_->run_single_step(loop_number_++) ||
+        simcontrol_->end_condition_reached();
+    while (!done && !delayed_task_.update(simcontrol_->t()).first) {
+        done = !simcontrol_->run_single_step(loop_number_++) ||
+        simcontrol_->end_condition_reached();
+    }
 
     update_observation();
 
@@ -488,9 +582,6 @@ pybind11::tuple ScrimmageOpenAIEnv::step(pybind11::object action) {
     std::tie(py_reward, py_done, py_info) = calc_reward();
 
     done |= py_done.cast<bool>();
-    if (done) {
-        close();
-    }
     py_done = py::bool_(done);
 
     return py::make_tuple(observation, py_reward, py_done, py_info);
@@ -502,7 +593,7 @@ std::tuple<pybind11::float_, pybind11::bool_, pybind11::dict> ScrimmageOpenAIEnv
     py::list info_done;
     py::list info_reward;
 
-    double t = simcontrol_.t();
+    double t = simcontrol_->t();
     double dt = mp_->dt(); // TODO: rely on time pointer
 
     double reward = 0;
@@ -591,23 +682,76 @@ void ScrimmageOpenAIEnv::distribute_action(pybind11::object action) {
 
 void add_openai_env(pybind11::module &m) {
     py::class_<ScrimmageOpenAIEnv>(m, "ScrimmageOpenAIEnv")
-        .def(py::init<std::string&, bool, bool, bool>(),
-            "docs",
+        .def(py::init<std::string&, bool, bool, bool, double>(),
+            R"(Scrimmage Open AI Environment Constructor.
+
+Parameters
+----------
+mission_file : str
+    the mission file to be run (does not need the full path, e.g. \"straight.xml\"
+
+enable_gui : bool
+    whether to start a gui. This will run scrimmage-viz in the
+    background.  Make sure your mission file is set to output to
+    localhost:50051, e.g.,
+
+      <stream_port>50051</stream_port>
+      <stream_ip>localhost</stream_ip>
+
+combine_actors : bool
+    whether to present the actions and observations of multiple
+    learners as a single action/observation.
+    This is only relevant when there are more than one learner in a
+    scenario. See test_openai.py for use examples.
+
+global_sensor : bool
+    whether to only use the first single observation. This is only
+    relevant when there are multiple learners and combine_actors is
+    set to False. It is designed to be used when
+    agents all have the same information.
+
+timestep : float
+    run scrimmage for multiple timesteps before outputting
+    the observation and reward on env.step().
+)",
             py::arg("mission_file"),
             py::arg("enable_gui") = false,
             py::arg("combine_actors") = false,
-            py::arg("global_sensor") = false)
-        .def("step", &ScrimmageOpenAIEnv::step)
+            py::arg("global_sensor") = false,
+            py::arg("timestep") = -1)
+        .def("step", &ScrimmageOpenAIEnv::step,
+            R"(Run scrimmage for one step.
+
+The return is dependent on combine_actors and global_sensor.
+
+obs : varies
+    * nump.array - observation_space is Discrete, MultiDiscrete, or Box
+    * length 2 list of np arrays - observation space is Tuple
+
+    When there are multiple learners, the output will be a list
+    with one element for each learner. Each element of the list
+    will correspond to the logic above for each agent.
+
+reward : float
+
+done : bool
+
+info : dict
+   info[\"reward\"] and info[\"done\"]
+   is a list of the individual rewards and done status for each learner.
+   When there is a single learner, these lists have length 1.
+)")
         .def_readwrite("reward_range", &ScrimmageOpenAIEnv::reward_range)
         .def_readwrite("action_space", &ScrimmageOpenAIEnv::action_space)
         .def_readwrite("observation_space", &ScrimmageOpenAIEnv::observation_space)
         .def_readwrite("observation", &ScrimmageOpenAIEnv::observation)
         .def_readwrite("spec", &ScrimmageOpenAIEnv::spec)
         .def_readwrite("metadata", &ScrimmageOpenAIEnv::metadata)
-        .def("reset", &ScrimmageOpenAIEnv::reset)
-        .def("close", &ScrimmageOpenAIEnv::close)
-        .def("seed", &ScrimmageOpenAIEnv::seed)
+        .def("reset", &ScrimmageOpenAIEnv::reset, "restart scrimmage")
+        .def("close", &ScrimmageOpenAIEnv::close, "closes scrimmage")
+        .def("seed", &ScrimmageOpenAIEnv::seed, "Set the seed used in the mission file")
         .def("render", &ScrimmageOpenAIEnv::render,
+            "no-op. Use \"enable_gui\" if you want to see a visual",
             py::arg("mode") = "human")
         .def_property_readonly("unwrapped", &ScrimmageOpenAIEnv::get_this);
 }

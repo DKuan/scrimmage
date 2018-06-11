@@ -340,6 +340,7 @@ boost::optional<std::string> postprocess_scrimmage(
         std::cout << "Simulation Complete" << std::endl;
     }
 
+    simcontrol.close();
     return mp->log_dir();
 }
 

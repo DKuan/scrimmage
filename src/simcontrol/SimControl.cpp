@@ -828,11 +828,51 @@ void SimControl::cleanup() {
         ent_inter->close(t());
     }
 
+    for (auto &kv : *networks_) {
+        kv.second->close(t());
+    }
+
     run_logging();
 
     if (display_progress_) cout << endl;
 
     set_finished(true);
+
+}
+
+void SimControl::close() {
+    id_to_ent_map_ = nullptr;
+    incoming_interface_ = nullptr;
+    mp_ = nullptr;
+    ents_.clear();
+    contacts_ = nullptr;
+    shapes_.clear();
+    contact_visuals_.clear();
+    time_ = nullptr;
+    entity_pool_queue_.clear();
+    log_ = nullptr;
+    random_ = nullptr;
+    plugin_manager_ = nullptr;
+    proj_ = nullptr;
+
+    ent_inters_.clear();
+    metrics_.clear();
+    networks_->clear();
+    pubsub_->pubs().clear();
+    pubsub_->subs().clear();
+    pubsub_ = nullptr;
+    file_search_ = nullptr;
+    rtree_ = nullptr;
+    sim_plugin_->close(t());
+    pub_end_time_ = nullptr;
+    pub_ent_gen_ = nullptr;
+    pub_ent_rm_ = nullptr;
+    pub_ent_pres_end_ = nullptr;
+    pub_ent_int_exit_ = nullptr;
+    pub_no_teams_ = nullptr;
+    pub_one_team_ = nullptr;
+    pub_world_point_clicked_ = nullptr;
+    not_ready_.clear();
 }
 
 bool SimControl::wait_for_ready() {

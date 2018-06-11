@@ -43,7 +43,7 @@ class Message : public MessageBase {
  public:
     Message() : MessageBase() {}
     explicit Message(T _data, const std::string &_serialized_data = "") :
-      MessageBase(_serialized_data), data(_data) {}
+      MessageBase(), data(_data) {}
     T data;
 };
 

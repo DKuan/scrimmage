@@ -43,7 +43,7 @@ MISSION_FILE = 'rlsimple.xml'
 TEMP_MISSION_FILE = '.rlsimple.xml'
 
 
-def _run_test(version, combine_actors, global_sensor, get_action):
+def _run_test(version, combine_actors, global_sensor, get_action, timestep = -1):
     try:
         env = gym.make(version)
     except gym.error.Error:
@@ -55,7 +55,8 @@ def _run_test(version, combine_actors, global_sensor, get_action):
             kwargs={"enable_gui": False,
                     "combine_actors": combine_actors,
                     "global_sensor": global_sensor,
-                    "mission_file": TEMP_MISSION_FILE}
+                    "mission_file": TEMP_MISSION_FILE,
+                    "timestep": timestep}
         )
         env = gym.make(version)
 
@@ -230,7 +231,7 @@ def test_sim_end():
     def _get_action(i):
         return 1 if i < 100 else 0
 
-    VERSION = 'scrimmage-v0'
+    VERSION = 'scrimmage-v6'
     _write_temp_mission(x_discrete=True, ctrl_y=False, y_discrete=True,
                         num_actors=1, end=2)
     combine_actors = False
@@ -238,6 +239,27 @@ def test_sim_end():
     obs = _run_test(VERSION, combine_actors, global_sensor, _get_action)[1]
     assert len(obs) == 3
 
+
+def test_timestep():
+    """Open single entity scenario and make sure it banks."""
+    def _get_action(i):
+        return 1 if i < 100 else 0
+
+    VERSION = 'scrimmage-v7'
+    _write_temp_mission(x_discrete=True, ctrl_y=False, y_discrete=True,
+                        num_actors=1, end=1000)
+    combine_actors = False
+    global_sensor = False
+    env, obs, total_reward = \
+        _run_test(VERSION, combine_actors, global_sensor, _get_action, 10)
+
+    assert len(obs[0]) == 1
+    assert obs[0][0] == 0
+    assert obs[1][0] == 10
+    assert isinstance(env.action_space, gym.spaces.Discrete)
+    assert isinstance(env.observation_space, gym.spaces.Box)
+    assert env.action_space.n == 2
+    assert total_reward == 0
 
 if __name__ == '__main__':
     test_one_dim_discrete()
@@ -247,3 +269,4 @@ if __name__ == '__main__':
     test_two_not_combined_veh_dim_discrete()
     test_sim_end()
     test_two_combined_veh_dim_discrete_global_sensor()
+    test_timestep()

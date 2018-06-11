@@ -51,7 +51,8 @@ class ScrimmageOpenAIEnv {
     ScrimmageOpenAIEnv(const std::string &mission_file,
                        bool enable_gui = false,
                        bool combine_actors = false,
-                       bool global_sensor = false);
+                       bool global_sensor = false,
+                       double timestep = -1);
 
     pybind11::tuple step(pybind11::object action);
     pybind11::object reset();
@@ -77,12 +78,15 @@ class ScrimmageOpenAIEnv {
     bool combine_actors_ = false;
     bool global_sensor_ = false;
     bool enable_gui_ = false;
+    scrimmage::DelayedTask delayed_task_;
 
     std::thread thread_;
 
-    scrimmage::SimControl simcontrol_;
+    std::shared_ptr<scrimmage::SimControl> simcontrol_;
     std::shared_ptr<scrimmage::Log> log_;
     scrimmage::MissionParsePtr mp_;
+    bool seed_set_ = false;
+    int seed_;
 
     using ExternalControlPtr = std::shared_ptr<scrimmage::autonomy::ExternalControl>;
     using ScrimmageOpenAISensor = std::shared_ptr<scrimmage::sensor::ScrimmageOpenAISensor>;
@@ -97,6 +101,7 @@ class ScrimmageOpenAIEnv {
     std::tuple<pybind11::float_, pybind11::bool_, pybind11::dict> calc_reward();
     void distribute_action(pybind11::object action);
     void reset_scrimmage(bool enable_gui);
+    void scrimmage_memory_cleanup();
     void run_viewer();
     int loop_number_ = 0;
     std::thread viewer_thread_;
