@@ -837,12 +837,14 @@ void SimControl::cleanup() {
     if (display_progress_) cout << endl;
 
     set_finished(true);
-
 }
 
 void SimControl::close() {
     id_to_ent_map_ = nullptr;
+    incoming_interface_->clear();
+    outgoing_interface_->clear();
     incoming_interface_ = nullptr;
+    outgoing_interface_ = nullptr;
     mp_ = nullptr;
     ents_.clear();
     contacts_ = nullptr;

@@ -51,7 +51,6 @@ class RLSimple : public scrimmage::autonomy::ScrimmageOpenAIAutonomy {
     std::pair<bool, double> calc_reward(double t, double dt) override;
 
  protected:
-
     double radius_;
 
     bool x_discrete_ = true;

@@ -543,6 +543,7 @@ ControllerPtr Entity::init_controller(
 
 void Entity::set_time_ptr(TimePtr t) {time_ = t;}
 
+// cppcheck-suppress passedByValue
 void Entity::set_projection(std::shared_ptr<GeographicLib::LocalCartesian> proj) {
     proj_ = proj;
 }

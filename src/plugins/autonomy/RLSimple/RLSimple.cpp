@@ -68,7 +68,6 @@ void RLSimple::init(std::map<std::string, std::string> &params) {
     radius_ = std::stod(params.at("radius"));
 
     ScrimmageOpenAIAutonomy::init(params);
-
 }
 
 void RLSimple::set_environment() {
