@@ -29,41 +29,46 @@
  * A Long description goes here.
  *
  */
-#ifndef INCLUDE_SCRIMMAGE_PLUGINS_AUTONOMY_EXTERNALCONTROL_EXTERNALCONTROLCLIENT_H_
-#define INCLUDE_SCRIMMAGE_PLUGINS_AUTONOMY_EXTERNALCONTROL_EXTERNALCONTROLCLIENT_H_
 
-#include <scrimmage/fwd_decl.h>
-#include <scrimmage/proto/ExternalControl.pb.h>
-#include <scrimmage/proto/ExternalControl.grpc.pb.h>
+#include <scrimmage/entity/Entity.h>
+#include <scrimmage/parse/ParseUtils.h>
+#include <scrimmage/plugins/autonomy/ScrimmageOpenAIAutonomy/ScrimmageOpenAIAutonomy.h>
+#include <scrimmage/plugin_manager/RegisterPlugin.h>
+#include <scrimmage/pubsub/Message.h>
+#include <scrimmage/math/State.h>
+#include <scrimmage/sensor/Sensor.h>
 
-#include <map>
-#include <string>
+#include <iostream>
+#include <limits>
 
-namespace grpc {
-class Channel;
-}
+#include <boost/algorithm/string.hpp>
 
-namespace boost {
-template <class T> class optional;
-}
+#include <chrono> // NOLINT
+#include <thread> // NOLINT
+
+namespace sp = scrimmage_proto;
+
+REGISTER_PLUGIN(scrimmage::Autonomy, scrimmage::autonomy::ScrimmageOpenAIAutonomy, ScrimmageOpenAIAutonomy_plugin)
 
 namespace scrimmage {
 namespace autonomy {
-class ExternalControlClient {
- public:
-    ExternalControlClient() = default;
-    explicit ExternalControlClient(std::shared_ptr<grpc::Channel> channel);
 
-    bool send_environments(scrimmage_proto::Environments &envs);
+ScrimmageOpenAIAutonomy::ScrimmageOpenAIAutonomy() :
+    reward_range(-std::numeric_limits<double>::infinity(),
+                 std::numeric_limits<double>::infinity()) {}
 
-    boost::optional<scrimmage_proto::Actions>
-    send_action_results(scrimmage_proto::ActionResults &action_results);
-    void set_timeout(double timeout);
+void ScrimmageOpenAIAutonomy::init(std::map<std::string, std::string> &/*params*/) {
+    print_err_on_exit = false;
+    return;
+}
 
- protected:
-    std::unique_ptr<scrimmage_proto::ExternalControl::Stub> stub_;
-    double timeout_ = 60;
-};
+bool ScrimmageOpenAIAutonomy::step_autonomy(double /*t*/, double /*dt*/) {
+    return false;
+}
+
+std::pair<bool, double> ScrimmageOpenAIAutonomy::calc_reward(double /*t*/, double /*dt*/) {
+    return {false, 0.0};
+}
+
 } // namespace autonomy
 } // namespace scrimmage
-#endif // INCLUDE_SCRIMMAGE_PLUGINS_AUTONOMY_EXTERNALCONTROL_EXTERNALCONTROLCLIENT_H_

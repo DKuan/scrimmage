@@ -19,8 +19,8 @@ ADD_LIBRARY(${LIBRARY_NAME} SHARED
 
 TARGET_LINK_LIBRARIES(${LIBRARY_NAME}
   ${GTRI_TACTICS_LIBS}
-  ${SCRIMMAGE_LIBRARIES}
-  ExternalControl_plugin
+  scrimmage
+  ScrimmageOpenAIAutonomy_plugin
   RLSimple_plugin
   )
 

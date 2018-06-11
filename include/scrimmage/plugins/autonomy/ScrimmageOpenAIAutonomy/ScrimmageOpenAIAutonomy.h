@@ -30,16 +30,14 @@
  *
  */
 
-#ifndef INCLUDE_SCRIMMAGE_PLUGINS_AUTONOMY_EXTERNALCONTROL_EXTERNALCONTROL_H_
-#define INCLUDE_SCRIMMAGE_PLUGINS_AUTONOMY_EXTERNALCONTROL_EXTERNALCONTROL_H_
+#ifndef INCLUDE_SCRIMMAGE_PLUGINS_AUTONOMY_SCRIMMAGEOPENAIAUTONOMY_SCRIMMAGEOPENAIAUTONOMY_H_
+#define INCLUDE_SCRIMMAGE_PLUGINS_AUTONOMY_SCRIMMAGEOPENAIAUTONOMY_SCRIMMAGEOPENAIAUTONOMY_H_
 
 #include <scrimmage/autonomy/Autonomy.h>
-#include <scrimmage/proto/ExternalControl.pb.h>
 
 #include <map>
 #include <vector>
 #include <string>
-#include <limits>
 #include <utility>
 
 namespace scrimmage {
@@ -56,9 +54,9 @@ struct EnvValues {
 
 namespace autonomy {
 
-class ExternalControl : public scrimmage::Autonomy {
+class ScrimmageOpenAIAutonomy : public scrimmage::Autonomy {
  public:
-    ExternalControl();
+    ScrimmageOpenAIAutonomy();
 
     // normal overrides
     void init(std::map<std::string, std::string> &params) override;
@@ -73,4 +71,4 @@ class ExternalControl : public scrimmage::Autonomy {
 };
 } // namespace autonomy
 } // namespace scrimmage
-#endif // INCLUDE_SCRIMMAGE_PLUGINS_AUTONOMY_EXTERNALCONTROL_EXTERNALCONTROL_H_
+#endif // INCLUDE_SCRIMMAGE_PLUGINS_AUTONOMY_SCRIMMAGEOPENAIAUTONOMY_SCRIMMAGEOPENAIAUTONOMY_H_

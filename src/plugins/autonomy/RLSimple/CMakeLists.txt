@@ -20,7 +20,7 @@ ADD_LIBRARY(${LIBRARY_NAME} SHARED
 TARGET_LINK_LIBRARIES(${LIBRARY_NAME}
   ${GTRI_TACTICS_LIBS}
   scrimmage
-  ExternalControl_plugin
+  ScrimmageOpenAIAutonomy_plugin
   )
 
 SET (_soversion ${LIB_MAJOR}.${LIB_MINOR}.${LIB_RELEASE})

@@ -36,7 +36,6 @@
 #include <scrimmage/math/State.h>
 #include <scrimmage/parse/ParseUtils.h>
 #include <scrimmage/plugin_manager/RegisterPlugin.h>
-#include <scrimmage/proto/ExternalControl.pb.h>
 
 #include <boost/range/adaptor/map.hpp>
 

@@ -36,7 +36,6 @@
 #include <scrimmage/parse/MissionParse.h>
 #include <scrimmage/parse/ParseUtils.h>
 #include <scrimmage/plugin_manager/RegisterPlugin.h>
-#include <scrimmage/proto/ExternalControl.pb.h>
 
 #include <scrimmage/plugins/autonomy/RLConsensus/RLConsensus.h>
 

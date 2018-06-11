@@ -1,9 +1,0 @@
-<?xml version="1.0"?>
-<?xml-stylesheet type="text/xsl" href="http://gtri.gatech.edu"?>
-<params>
-  <library>ExternalControlInteraction_plugin</library>  
-  <server_address>localhost:50051</server_address>
-  <timeout>60</timeout>
-  <global_sensor>false</global_sensor>
-  <timestep>0</timestep>>
-</params>

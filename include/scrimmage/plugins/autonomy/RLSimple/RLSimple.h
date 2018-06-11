@@ -33,7 +33,7 @@
 #ifndef INCLUDE_SCRIMMAGE_PLUGINS_AUTONOMY_RLSIMPLE_RLSIMPLE_H_
 #define INCLUDE_SCRIMMAGE_PLUGINS_AUTONOMY_RLSIMPLE_RLSIMPLE_H_
 
-#include <scrimmage/plugins/autonomy/ExternalControl/ExternalControl.h>
+#include <scrimmage/plugins/autonomy/ScrimmageOpenAIAutonomy/ScrimmageOpenAIAutonomy.h>
 
 #include <map>
 #include <string>
@@ -42,7 +42,7 @@
 namespace scrimmage {
 namespace autonomy {
 
-class RLSimple : public scrimmage::autonomy::ExternalControl {
+class RLSimple : public scrimmage::autonomy::ScrimmageOpenAIAutonomy {
  public:
     void init(std::map<std::string, std::string> &params) override;
     bool step_autonomy(double t, double dt) override;

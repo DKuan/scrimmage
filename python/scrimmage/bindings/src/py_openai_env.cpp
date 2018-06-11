@@ -517,7 +517,7 @@ void ScrimmageOpenAIEnv::reset_scrimmage(bool enable_gui) {
     ext_sensor_vec_.clear();
     for (auto &e : simcontrol_->ents()) {
         for (auto &a : e->autonomies()) {
-            auto a_cast = std::dynamic_pointer_cast<sc::autonomy::ExternalControl>(a);
+            auto a_cast = std::dynamic_pointer_cast<sc::autonomy::ScrimmageOpenAIAutonomy>(a);
             if (a_cast) {
                 ext_ctrl_vec_.push_back(a_cast);
 

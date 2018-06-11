@@ -34,7 +34,6 @@
 #include <scrimmage/math/State.h>
 #include <scrimmage/parse/ParseUtils.h>
 #include <scrimmage/plugin_manager/RegisterPlugin.h>
-#include <scrimmage/proto/ExternalControl.pb.h>
 
 #include <scrimmage/plugins/autonomy/RLSimple/RLSimple.h>
 
@@ -68,7 +67,7 @@ void RLSimple::init(std::map<std::string, std::string> &params) {
 
     radius_ = std::stod(params.at("radius"));
 
-    ExternalControl::init(params);
+    ScrimmageOpenAIAutonomy::init(params);
 
 }
 

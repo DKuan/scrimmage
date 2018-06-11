@@ -1,7 +1,7 @@
 #--------------------------------------------------------
 # Library Creation
 #--------------------------------------------------------
-SET (LIBRARY_NAME ExternalControlInteraction_plugin)
+SET (LIBRARY_NAME ScrimmageOpenAIAutonomy_plugin)
 SET (LIB_MAJOR 0)
 SET (LIB_MINOR 0)
 SET (LIB_RELEASE 1)
@@ -12,10 +12,12 @@ ADD_LIBRARY(${LIBRARY_NAME} SHARED
   ${SRCS}
   )
 
+add_dependencies(${LIBRARY_NAME} scrimmage scrimmage-proto-gen)
+
 TARGET_LINK_LIBRARIES(${LIBRARY_NAME}
-    ExternalControl_plugin
-    scrimmage
+  ${SCRIMMAGE_LIBS}
   )
+
 
 SET (_soversion ${LIB_MAJOR}.${LIB_MINOR}.${LIB_RELEASE})
 

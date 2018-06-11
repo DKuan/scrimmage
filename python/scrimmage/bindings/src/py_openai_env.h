@@ -33,7 +33,7 @@
 #include <pybind11/pybind11.h>
 
 #include <scrimmage/parse/MissionParse.h>
-#include <scrimmage/plugins/autonomy/ExternalControl/ExternalControl.h>
+#include <scrimmage/plugins/autonomy/ScrimmageOpenAIAutonomy/ScrimmageOpenAIAutonomy.h>
 #include <scrimmage/plugins/sensor/ScrimmageOpenAISensor/ScrimmageOpenAISensor.h>
 #include <scrimmage/simcontrol/SimControl.h>
 
@@ -88,7 +88,7 @@ class ScrimmageOpenAIEnv {
     bool seed_set_ = false;
     int seed_;
 
-    using ExternalControlPtr = std::shared_ptr<scrimmage::autonomy::ExternalControl>;
+    using ExternalControlPtr = std::shared_ptr<scrimmage::autonomy::ScrimmageOpenAIAutonomy>;
     using ScrimmageOpenAISensor = std::shared_ptr<scrimmage::sensor::ScrimmageOpenAISensor>;
 
     std::vector<ExternalControlPtr> ext_ctrl_vec_;
