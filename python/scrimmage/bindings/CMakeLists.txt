@@ -7,10 +7,10 @@ include_directories(include)
 
 pybind11_add_module(${LIBRARY_NAME}
   src/py_bindings.cpp
-  # src/py_math.cpp
-  # src/py_pubsub.cpp
-  # src/py_common.cpp
-  # src/py_autonomy.cpp
+  src/py_math.cpp
+  src/py_pubsub.cpp
+  src/py_common.cpp
+  src/py_autonomy.cpp
   src/py_openai_env.cpp
   src/py_utils.cpp)
 

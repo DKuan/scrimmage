@@ -40,11 +40,11 @@ PYBIND11_DECLARE_HOLDER_TYPE(T, std::shared_ptr<T>)
 PYBIND11_MODULE(py_bindings, m) {
     m.doc() = "pybind11 example plugin";
 
-    // add_math(m);
-    // add_pubsub(m);
-    // add_common(m);
-    // add_autonomy(m);
+    add_math(m);
+    add_pubsub(m);
+    add_common(m);
+    add_autonomy(m);
     add_openai_env(m);
 
-    // m.def("frames2pandas", &frames2pandas, "converts a protobuf frames.bin file to a pandas DataFrame");
+    m.def("frames2pandas", &frames2pandas, "converts a protobuf frames.bin file to a pandas DataFrame");
 }
