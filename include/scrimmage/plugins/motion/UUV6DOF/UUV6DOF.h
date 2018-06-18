@@ -35,15 +35,43 @@
 #include <scrimmage/math/State.h>
 #include <scrimmage/motion/MotionModel.h>
 #include <scrimmage/motion/Controller.h>
-#include <scrimmage/common/PID.h>
+#include <scrimmage/common/CSV.h>
+
+#include <scrimmage/plugins/motion/RigidBody6DOF/RigidBody6DOFBase.h>
 
 #include <map>
 #include <string>
 
 namespace scrimmage {
 namespace motion {
-class UUV6DOF : public scrimmage::MotionModel {
+class UUV6DOF : public scrimmage::motion::RigidBody6DOFBase {
  public:
+    enum ModelParams {
+        U = 0,
+        V,
+        W,
+        P,
+        Q,
+        R,
+        U_dot,
+        V_dot,
+        W_dot,
+        P_dot,
+        Q_dot,
+        R_dot,
+        Uw,
+        Vw,
+        Ww,
+        Xw,
+        Yw,
+        Zw,
+        q0,
+        q1,
+        q2,
+        q3,
+        MODEL_NUM_ITEMS
+    };
+
     UUV6DOF();
 
     bool init(std::map<std::string, std::string> &info,
@@ -60,6 +88,18 @@ class UUV6DOF : public scrimmage::MotionModel {
  protected:
     double length_;
     bool enable_gravity_;
+
+    Eigen::Quaterniond rot_180_x_axis_;
+
+    Eigen::Matrix3d I_;
+    Eigen::Matrix3d I_inv_;
+
+    scrimmage::Quaternion quat_body_;
+    Eigen::Vector3d force_ext_body_;
+
+    // Logging utility
+    bool write_csv_ = false;
+    CSV csv_;
 
  private:
 };
