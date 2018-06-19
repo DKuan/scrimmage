@@ -95,6 +95,7 @@ bool UUV6DOF::init(std::map<std::string, std::string> &info,
     // Parse XML parameters
     g_ = sc::get<double>("gravity_magnitude", params, 9.81);
     mass_ = sc::get<double>("mass", params, 1.2);
+    buoyancy_ = sc::get<double>("buoyancy", params, buoyancy_);
 
     // Get the inertia matrix
     std::vector<std::vector<std::string>> vecs;
@@ -146,6 +147,38 @@ bool UUV6DOF::init(std::map<std::string, std::string> &info,
                     "roll", "pitch", "yaw",
                     });
     }
+
+    // rho_ = sc::get<double>("rho", params, rho_);
+    // c_d_ = sc::get<double>("c_d", params, c_d_);
+    // A_f_ = sc::get<double>("A_f", params, A_f_);
+
+    Xuu_ = sc::get<double>("Xuu", params, Xuu_);
+    Yvv_ = sc::get<double>("Yvv", params, Yvv_);
+    Zww_ = sc::get<double>("Zww", params, Zww_);
+    Mww_ = sc::get<double>("Mww", params, Mww_);
+    Yrr_ = sc::get<double>("Yrr", params, Yrr_);
+    Mqq_ = sc::get<double>("Mqq", params, Mqq_);
+
+    {
+        // Parse center of gravity
+        std::vector<double> c_g_vec;
+        if (sc::get_vec<double>("c_g", params, ", ", c_g_vec, 3)) {
+            c_g_ = sc::vec2eigen(c_g_vec);
+        } else {
+            cout << "Warning: Invalid center of gravity, c_g." << endl;
+        }
+    }
+
+    {
+        // Parse center of buoyancy
+        std::vector<double> c_b_vec;
+        if (sc::get_vec<double>("c_b", params, ", ", c_b_vec, 3)) {
+            c_b_ = sc::vec2eigen(c_b_vec);
+        } else {
+            cout << "Warning: Invalid center of buoyancy, c_b." << endl;
+        }
+    }
+
     return true;
 }
 
@@ -227,10 +260,20 @@ void UUV6DOF::model(const vector_t &x, vector_t &dxdt, double t) {
     // Calculate force from weight in body frame:
     Eigen::Vector3d gravity_vector(0, 0, +mass_*g_);
     Eigen::Vector3d F_weight = quat_body_.rotate_reverse(gravity_vector);
-    Eigen::Vector3d F_buoyancy = -F_weight;
+
+    Eigen::Vector3d buoyancy_vector (0, 0, buoyancy_);
+    Eigen::Vector3d F_buoyancy = quat_body_.rotate_reverse(buoyancy_vector);
+
+    Eigen::Vector3d F_hydro = F_weight - F_buoyancy;
+    Eigen::Vector3d Moments_hydro = c_g_.cross(F_weight) - c_b_.cross(F_buoyancy);
+
+    Eigen::Vector3d F_drag(Xuu_ * x[U] * x[U],
+                           Yvv_ * x[V] * x[V],
+                           Zww_ * x[W] * x[W]);
+
 
     Eigen::Vector3d F_thrust(0, 0, 0);
-    Eigen::Vector3d F_total = F_weight + F_buoyancy + F_thrust;
+    Eigen::Vector3d F_total = F_hydro + F_drag;
 
     // Calculate body frame linear velocities
     dxdt[U] = x[V]*x[R] - x[W]*x[Q] + F_total(0) / mass_;
@@ -240,11 +283,9 @@ void UUV6DOF::model(const vector_t &x, vector_t &dxdt, double t) {
     // Calculate moments;
     Eigen::Vector3d Moments_thrust(0, 0, 0); // no moment from thrust
     Eigen::Vector3d Moments_torque(0, 0, 0); // no moment from torque
-    Eigen::Vector3d Moments_gyro(0, 0, 0);   // no moment from gyro effect
 
     // Sum moments
-    Eigen::Vector3d Moments_total = Moments_thrust +
-        Moments_torque + Moments_gyro;
+    Eigen::Vector3d Moments_total = Moments_hydro + Moments_thrust + Moments_torque;
 
     // Calculate rotational velocites
     Eigen::Vector3d pqr(x_[P], x_[Q], x_[R]);

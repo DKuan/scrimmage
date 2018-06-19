@@ -101,6 +101,23 @@ class UUV6DOF : public scrimmage::motion::RigidBody6DOFBase {
     bool write_csv_ = false;
     CSV csv_;
 
+    double buoyancy_ = 306.0;
+
+    double Xuu_ = -1.620;
+    double Yvv_ = -131.0;
+    double Zww_ = -131.0;
+    double Mww_ = +3.180;
+    double Yrr_ = +0.632;
+    double Mqq_ = -9.400;
+
+    // double rho_ = 1030.0;
+    // double c_d_ = 0.27;
+    // double A_f_ = 0.0285;
+
+
+    Eigen::Vector3d c_g_;
+    Eigen::Vector3d c_b_;
+
  private:
 };
 } // namespace motion
