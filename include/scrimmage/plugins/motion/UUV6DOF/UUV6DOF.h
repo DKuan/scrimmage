@@ -85,6 +85,7 @@ class UUV6DOF : public scrimmage::motion::RigidBody6DOFBase {
      public:
         virtual Eigen::Vector2d &u() = 0;
     };
+
  protected:
     double length_;
     bool enable_gravity_;

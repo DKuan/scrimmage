@@ -252,16 +252,16 @@ bool UUV6DOF::step(double time, double dt) {
 
 void UUV6DOF::model(const vector_t &x, vector_t &dxdt, double t) {
     // Calculate velocity magnitude (handle zero velocity)
-    double V_tau = sqrt(pow(x_[U], 2) + pow(x_[V], 2) + pow(x_[W], 2));
-    if (std::abs(V_tau) < std::numeric_limits<double>::epsilon()) {
-        V_tau = 0.00001;
-    }
+    // double V_tau = sqrt(pow(x_[U], 2) + pow(x_[V], 2) + pow(x_[W], 2));
+    // if (std::abs(V_tau) < std::numeric_limits<double>::epsilon()) {
+    //     V_tau = 0.00001;
+    // }
 
     // Calculate force from weight in body frame:
     Eigen::Vector3d gravity_vector(0, 0, +mass_*g_);
     Eigen::Vector3d F_weight = quat_body_.rotate_reverse(gravity_vector);
 
-    Eigen::Vector3d buoyancy_vector (0, 0, buoyancy_);
+    Eigen::Vector3d buoyancy_vector(0, 0, buoyancy_);
     Eigen::Vector3d F_buoyancy = quat_body_.rotate_reverse(buoyancy_vector);
 
     Eigen::Vector3d F_hydro = F_weight - F_buoyancy;
