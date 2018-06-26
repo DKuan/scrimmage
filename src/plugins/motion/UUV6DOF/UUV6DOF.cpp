@@ -92,41 +92,80 @@ bool UUV6DOF::init(std::map<std::string, std::string> &info,
     x_[q2] = quat_body_.y();
     x_[q3] = quat_body_.z();
 
+    x_[U_dot] = 0;
+    x_[V_dot] = 0;
+    x_[W_dot] = 0;
+    x_[P_dot] = 0;
+    x_[Q_dot] = 0;
+    x_[R_dot] = 0;
+
     // Parse XML parameters
     g_ = sc::get<double>("gravity_magnitude", params, 9.81);
     mass_ = sc::get<double>("mass", params, 1.2);
     buoyancy_ = sc::get<double>("buoyancy", params, buoyancy_);
 
-    // Get the inertia matrix
-    std::vector<std::vector<std::string>> vecs;
-    std::string inertia_matrix = sc::get<std::string>("inertia_matrix",
-                                                      params, "");
+    {
+        // Get the inertia matrix
+        std::vector<std::vector<std::string>> vecs;
+        std::string inertia_matrix = sc::get<std::string>("inertia_matrix",
+                                                          params, "");
+        // Parse inertia matrix
+        bool valid_inertia = false;
+        if (!sc::get_vec_of_vecs(inertia_matrix, vecs)) {
+            cout << "Failed to parse inertia_matrix:" << inertia_matrix << endl;
+        } else {
+            int row = 0;
+            for (std::vector<std::string> vec : vecs) {
+                if (vec.size() != 3) {
+                    cout << "Invalid vector size in: " << inertia_matrix << endl;
+                    break;
+                }
+                for (int i = 0; i < 3; i++) {
+                    I_(row, i) = std::stod(vec[i]);
+                }
+                row++;
+            }
+            if (row == 3) {
+                valid_inertia = true;
+            }
+        }
+        if (!valid_inertia) {
+            cout << "Using identity matrix for inertia." << endl;
+            I_ = Eigen::Matrix3d::Identity();
+        }
+        I_inv_ = I_.inverse();
+    }
 
-    // Parse inertia matrix
-    bool valid_inertia = false;
-    if (!sc::get_vec_of_vecs(inertia_matrix, vecs)) {
-        cout << "Failed to parse inertia_matrix:" << inertia_matrix << endl;
-    } else {
-        int row = 0;
-        for (std::vector<std::string> vec : vecs) {
-            if (vec.size() != 3) {
-                cout << "Invalid vector size in: " << inertia_matrix << endl;
-                break;
+    {
+        // Parse Added Mass Matrix
+        // Get the inertia matrix
+        std::vector<std::vector<std::string>> vecs;
+        std::string added_mass_matrix = sc::get<std::string>("added_mass",
+                                                             params, "");
+        bool valid_added_mass = false;
+        if (!sc::get_vec_of_vecs(added_mass_matrix, vecs)) {
+            cout << "Failed to parse added_mass:" << added_mass_matrix << endl;
+        } else {
+            int row = 0;
+            for (std::vector<std::string> vec : vecs) {
+                if (vec.size() != 6) {
+                    cout << "Invalid vector size in: " << added_mass_matrix << endl;
+                    break;
+                }
+                for (int i = 0; i < 6; i++) {
+                    added_mass_(row, i) = std::stod(vec[i]);
+                }
+                row++;
             }
-            for (int i = 0; i < 3; i++) {
-                I_(row, i) = std::stod(vec[i]);
+            if (row == 6) {
+                valid_added_mass = true;
             }
-            row++;
         }
-        if (row == 3) {
-            valid_inertia = true;
+        if (!valid_added_mass) {
+            cout << "Using identity matrix for added mass." << endl;
+            added_mass_ = Eigen::Matrix<double, 6, 6>::Identity();
         }
     }
-    if (!valid_inertia) {
-        cout << "Using identity matrix for inertia." << endl;
-        I_ = Eigen::Matrix3d::Identity();
-    }
-    I_inv_ = I_.inverse();
 
     // Should we write a CSV file? What values should be written?
     write_csv_ = sc::get<bool>("write_csv", params, false);
@@ -147,10 +186,6 @@ bool UUV6DOF::init(std::map<std::string, std::string> &info,
                     "roll", "pitch", "yaw",
                     });
     }
-
-    // rho_ = sc::get<double>("rho", params, rho_);
-    // c_d_ = sc::get<double>("c_d", params, c_d_);
-    // A_f_ = sc::get<double>("A_f", params, A_f_);
 
     Xuu_ = sc::get<double>("Xuu", params, Xuu_);
     Yvv_ = sc::get<double>("Yvv", params, Yvv_);
@@ -187,6 +222,8 @@ bool UUV6DOF::step(double time, double dt) {
 
     // Cache values to calculate changes:
     Eigen::Vector3d prev_linear_vel_ENU(x_[Uw], x_[Vw], x_[Ww]);
+
+    Eigen::Vector3d prev_linear_vel(x_[U], x_[V], x_[W]);
     Eigen::Vector3d prev_angular_vel(x_[P], x_[Q], x_[R]);
 
     // Apply any external forces (todo)
@@ -201,9 +238,18 @@ bool UUV6DOF::step(double time, double dt) {
     // Calculate change in velocity to populate acceleration elements
     Eigen::Vector3d linear_vel_ENU(x_[Uw], x_[Vw], x_[Ww]);
     Eigen::Vector3d linear_acc_ENU = (linear_vel_ENU - prev_linear_vel_ENU) / dt;
+    Eigen::Vector3d linear_vel(x_[U], x_[V], x_[W]);
     Eigen::Vector3d angular_vel(x_[P], x_[Q], x_[R]);
+    Eigen::Vector3d linear_acc = (linear_vel - prev_linear_vel) / dt;
     Eigen::Vector3d angular_acc = (angular_vel - prev_angular_vel) / dt;
     Eigen::Vector3d angular_acc_FLU(angular_acc(0), -angular_acc(1), -angular_acc(2));
+
+    x_[U_dot] = linear_acc(0);
+    x_[V_dot] = linear_acc(1);
+    x_[W_dot] = linear_acc(2);
+    x_[P_dot] = angular_acc(0);
+    x_[Q_dot] = angular_acc(1);
+    x_[R_dot] = angular_acc(2);
 
     // Rotate back to Z-axis pointing up
     state_->quat() = rot_180_x_axis_ * quat_body_;
@@ -251,11 +297,6 @@ bool UUV6DOF::step(double time, double dt) {
 }
 
 void UUV6DOF::model(const vector_t &x, vector_t &dxdt, double t) {
-    // Calculate velocity magnitude (handle zero velocity)
-    // double V_tau = sqrt(pow(x_[U], 2) + pow(x_[V], 2) + pow(x_[W], 2));
-    // if (std::abs(V_tau) < std::numeric_limits<double>::epsilon()) {
-    //     V_tau = 0.00001;
-    // }
 
     // Calculate force from weight in body frame:
     Eigen::Vector3d gravity_vector(0, 0, +mass_*g_);
@@ -267,32 +308,110 @@ void UUV6DOF::model(const vector_t &x, vector_t &dxdt, double t) {
     Eigen::Vector3d F_hydro = F_weight - F_buoyancy;
     Eigen::Vector3d Moments_hydro = c_g_.cross(F_weight) - c_b_.cross(F_buoyancy);
 
-    Eigen::Vector3d F_drag(Xuu_ * x[U] * x[U],
-                           Yvv_ * x[V] * x[V],
-                           Zww_ * x[W] * x[W]);
+    double Xu_dot = -0.93;
+    double Xwq = -35.5;
+    double Xqq = -1.93;
+    double Xvr = 35.5;
+    double Xrr = -1.93;
+    double Xprop = 0;// TODO: throttle-2.28 * Xuu_;
+
+    double X_ext = F_hydro(0) + Xuu_ * x[U] * std::abs(x[U]) + Xu_dot*x[U_dot]
+        + Xwq*x[W]*x[Q] + Xqq*x[Q]*x[Q] + Xvr*x[V]*x[R] + Xrr*x[R]*x[R] + Xprop;
+
+    double Yrr = 0.632;
+    double Yuv = -28.6;
+    double Yur = 5.22;
+    double Ywp = 35.5;
+    double Yv_dot = -35.5;
+    double Yr_dot = 1.93;
+    double Ypq = 1.93;
+    double Yuu_delta_r = 9.64;
+
+    double delta_r = 0;
+
+    double Y_ext = F_hydro(1) + Yvv_*x[V]*std::abs(x[V]) + Yrr*x[R]*std::abs(x[R])
+        + Yv_dot*x[V_dot] + Yr_dot*x[R_dot] + Yur*x[U]*x[R] + Ywp*x[W]*x[P]
+        + Ypq*x[P]*x[Q] + Yuv*x[U]*x[V] + Yuu_delta_r * pow(x[U], 2) * delta_r;
+
+    double Kp_dot = -0.0141;
+    double Nv_dot = 1.93;
+    double Mw_dot = -1.93;
+    double Zw_dot = -35.5;
+    double Zq_dot = -1.93;
+    double Mq_dot = -4.88;
+    double Nr_dot = -4.88;
+    double Ixx = I_(0, 0);
+    double Iyy = I_(1, 1);
+    double Izz = I_(2, 2);
+
+    double Zqq = -0.632;
+    double Zuq = -5.22;
+    double Zvp = -35.5;
+    double Zrp = 1.93;
+    double Zuw = -28.6;
+    double Zuu_delta_s = -9.64;
+    double delta_s = 0;
+
+    double Z_ext = F_hydro(2) + Zww_*x[W]*std::abs(x[W]) + Zqq*x[Q]*std::abs(x[Q])
+        + Zw_dot*x[W_dot] + Zq_dot*x[Q_dot] + Zuq*x[U]*x[Q] + Zvp*x[V]*x[P]
+        + Zrp*x[R]*x[P] + Zuw*x[U]*x[W] + Zuu_delta_s*pow(x[U], 2) * delta_s;
 
 
-    Eigen::Vector3d F_thrust(0, 0, 0);
-    Eigen::Vector3d F_total = F_hydro + F_drag;
+    double Kpp = -0.00130;
+    double Kprop = 0;// -0.543; // TODO: Proportion of thrust
 
-    // Calculate body frame linear velocities
-    dxdt[U] = x[V]*x[R] - x[W]*x[Q] + F_total(0) / mass_;
-    dxdt[V] = x[W]*x[P] - x[U]*x[R] + F_total(1) / mass_;
-    dxdt[W] = x[U]*x[Q] - x[V]*x[P] + F_total(2) / mass_;
+    // Roll moment
+    double K_ext = Moments_hydro(0) + Kpp*x[P]*std::abs(x[P]) + Kp_dot*x[P_dot] + Kprop;
 
-    // Calculate moments;
-    Eigen::Vector3d Moments_thrust(0, 0, 0); // no moment from thrust
-    Eigen::Vector3d Moments_torque(0, 0, 0); // no moment from torque
+    double Muq = -2.0;
+    double Mvp = -1.93;
+    double Mrp = 4.86;
+    double Muu_delta_s = -6.15;
+    double Muw = 24.0;
 
-    // Sum moments
-    Eigen::Vector3d Moments_total = Moments_hydro + Moments_thrust + Moments_torque;
+    // Pitch moment
+    double M_ext = Moments_hydro(1) + Mww_*x[W]*std::abs(x[W]) + Mqq_*x[Q]*std::abs(x[Q])
+        + Mw_dot*x[W_dot] + Mq_dot*x[Q_dot] + Muq*x[U]*x[Q] + Mvp*x[V]*x[P] + Mrp*x[R]*x[P]
+        + Muw*x[U]*x[W] + Muu_delta_s*pow(x[U], 2) * delta_s;
 
-    // Calculate rotational velocites
-    Eigen::Vector3d pqr(x_[P], x_[Q], x_[R]);
-    Eigen::Vector3d pqr_dot = I_inv_ * (Moments_total - pqr.cross(I_*pqr));
-    dxdt[P] = pqr_dot(0);
-    dxdt[Q] = pqr_dot(1);
-    dxdt[R] = pqr_dot(2);
+    double Nvv = -3.18;
+    double Nrr = -9.40;
+    double Nur = -2.00;
+    double Nwp = -1.93;
+    double Npq = -4.86;
+    double Nuv = -24.0;
+    double Nuu_delta_r = -6.15;
+
+    // Yaw moment
+    double N_ext = Moments_hydro(2) + Nvv*x[V]*std::abs(x[V]) + Nrr*x[R]*std::abs(x[R])
+        + Nv_dot*x[V_dot] + Nr_dot*x[R_dot] + Nur*x[U]*x[R] + Nwp*x[W]*x[P] + Npq*x[P]*x[Q]
+        + Nuv*x[U]*x[V] + Nuu_delta_r*pow(x[U], 2)*delta_r;
+
+    Eigen::Matrix<double, 6, 1> forces;
+    forces << X_ext, Y_ext, Z_ext, K_ext, M_ext, N_ext;
+
+    double m = mass_;
+    double xg = c_g_(0);
+    double yg = c_g_(1);
+    double zg = c_g_(2);
+
+    Eigen::Matrix<double, 6, 6> masses;
+    masses <<
+        m-Xu_dot, 0          , 0           , 0         , m*zg        , -m*yg      ,
+        0       , m-Yv_dot   , 0           , -m*zg     , 0           , m*xg-Yr_dot,
+        0       , 0          , m-Zw_dot    , m*yg      , -m*xg-Zq_dot, 0          ,
+        0       , -m*zg      , m*yg        , Ixx-Kp_dot, 0           , 0          ,
+        m*zg    , 0          , -m*xg-Mw_dot, 0         , Iyy-Mq_dot  , 0          ,
+        -m*yg   , m*xg-Nv_dot, 0           , 0         , 0           , Izz-Nr_dot;
+
+    Eigen::Matrix<double, 6, 1> accelerations = masses.inverse() * forces;
+
+    dxdt[U] = accelerations(0, 0);
+    dxdt[V] = accelerations(1, 0);
+    dxdt[W] = accelerations(2, 0);
+    dxdt[P] = accelerations(3, 0);
+    dxdt[Q] = accelerations(4, 0);
+    dxdt[R] = accelerations(5, 0);
 
     // Compute quaternion derivatives
     double lambda = 1 - (pow(x[q0], 2) + pow(x[q1], 2) + pow(x[q2], 2) + pow(x[q3], 2));
@@ -316,13 +435,13 @@ void UUV6DOF::model(const vector_t &x, vector_t &dxdt, double t) {
     dxdt[Yw] = -vel_world(1); // Due to rotated frame
     dxdt[Zw] = -vel_world(2); // Due to rotated frame
 
-    // Integrate local accelerations to compute global velocities
-    Eigen::Vector3d acc_local = F_total / mass_;
+    // // Integrate local accelerations to compute global velocities
+    Eigen::Vector3d acc_local = forces.head<3>() / mass_; // TODO : check
     Eigen::Vector3d acc_world = quat.rotate(acc_local); // rot * acc_local;
     dxdt[Uw] = acc_world(0);
     dxdt[Vw] = -acc_world(1); // Due to rotated frame
     dxdt[Ww] = -acc_world(2); // Due to rotated frame
-
+    //
     // Accelerations get updated based on change in velocities
     dxdt[U_dot] = 0;
     dxdt[V_dot] = 0;

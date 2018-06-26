@@ -18,8 +18,10 @@
   <mass>30.479102956</mass> <!-- kg -->
   <buoyancy>306.0</buoyancy> <!-- Newtons -->
 
+  <c_b>0.0, 0.0, 0.0</c_b> <!-- center of buoyancy r_B meters -->
+  <!--<c_b>-0.611, 0.0, 0.0000</c_b>--> <!-- center of buoyancy r_B meters -->
   <c_g> 0.000, 0.0, 0.0196</c_g> <!-- center of gravity r_G meters -->
-  <c_b>-0.611, 0.0, 0.0000</c_b> <!-- center of buoyancy r_B meters -->
+  
   
   <!-- <rho>1030.0</rho> --> <!-- seawater density kg/m^3 -->
   <!-- <c_d>0.27</c_d> -->

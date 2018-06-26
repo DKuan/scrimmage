@@ -104,6 +104,8 @@ class UUV6DOF : public scrimmage::motion::RigidBody6DOFBase {
 
     double buoyancy_ = 306.0;
 
+    Eigen::Matrix<double, 6, 6> added_mass_;
+
     double Xuu_ = -1.620;
     double Yvv_ = -131.0;
     double Zww_ = -131.0;
