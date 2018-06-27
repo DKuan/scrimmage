@@ -41,8 +41,11 @@
 
 #include <iostream>
 
+#include <boost/algorithm/clamp.hpp>
+
 using std::cout;
 using std::endl;
+using boost::algorithm::clamp;
 
 namespace sc = scrimmage;
 
@@ -53,8 +56,7 @@ REGISTER_PLUGIN(scrimmage::MotionModel,
 namespace scrimmage {
 namespace motion {
 
-UUV6DOF::UUV6DOF() : length_(1.0),
-                    enable_gravity_(false) {
+UUV6DOF::UUV6DOF() {
     Eigen::AngleAxisd aa(M_PI, Eigen::Vector3d::UnitX());
     rot_180_x_axis_ = Eigen::Quaterniond(aa);
     x_.resize(MODEL_NUM_ITEMS);
@@ -62,6 +64,11 @@ UUV6DOF::UUV6DOF() : length_(1.0),
 
 bool UUV6DOF::init(std::map<std::string, std::string> &info,
                      std::map<std::string, std::string> &params) {
+
+    throttle_idx_ = vars_.declare(VariableIO::Type::throttle, VariableIO::Direction::In);
+    elevator_idx_ = vars_.declare(VariableIO::Type::elevator, VariableIO::Direction::In);
+    rudder_idx_ = vars_.declare(VariableIO::Type::rudder, VariableIO::Direction::In);
+
     Eigen::Vector3d &pos = state_->pos();
 
     // Need to rotate axes by 180 degrees around X-axis SCRIMMAGE's global
@@ -219,6 +226,14 @@ bool UUV6DOF::init(std::map<std::string, std::string> &info,
 
 bool UUV6DOF::step(double time, double dt) {
     // Saturate inputs
+    throttle_ = clamp(vars_.input(throttle_idx_), -1.0, 1.0);
+    thrust_ = scale<double>(throttle_, -1.0, 1.0, thrust_min_, thrust_max_);
+
+    delta_elevator_ = clamp(vars_.input(elevator_idx_), -1.0, 1.0);
+    delta_elevator_ = scale<double>(delta_elevator_, -1.0, 1.0, delta_elevator_min_, delta_elevator_max_);
+
+    delta_rudder_ = clamp(vars_.input(rudder_idx_), -1.0, 1.0);
+    delta_rudder_ = scale<double>(delta_rudder_, -1.0, 1.0, delta_rudder_min_, delta_rudder_max_);
 
     // Cache values to calculate changes:
     Eigen::Vector3d prev_linear_vel_ENU(x_[Uw], x_[Vw], x_[Ww]);
@@ -297,7 +312,6 @@ bool UUV6DOF::step(double time, double dt) {
 }
 
 void UUV6DOF::model(const vector_t &x, vector_t &dxdt, double t) {
-
     // Calculate force from weight in body frame:
     Eigen::Vector3d gravity_vector(0, 0, +mass_*g_);
     Eigen::Vector3d F_weight = quat_body_.rotate_reverse(gravity_vector);
@@ -313,7 +327,7 @@ void UUV6DOF::model(const vector_t &x, vector_t &dxdt, double t) {
     double Xqq = -1.93;
     double Xvr = 35.5;
     double Xrr = -1.93;
-    double Xprop = 0;// TODO: throttle-2.28 * Xuu_;
+    double Xprop = thrust_; // -2.28 * Xuu_;// TODO: throttle-2.28 * Xuu_;
 
     double X_ext = F_hydro(0) + Xuu_ * x[U] * std::abs(x[U]) + Xu_dot*x[U_dot]
         + Xwq*x[W]*x[Q] + Xqq*x[Q]*x[Q] + Xvr*x[V]*x[R] + Xrr*x[R]*x[R] + Xprop;
@@ -327,7 +341,7 @@ void UUV6DOF::model(const vector_t &x, vector_t &dxdt, double t) {
     double Ypq = 1.93;
     double Yuu_delta_r = 9.64;
 
-    double delta_r = 0;
+    double delta_r = delta_rudder_; // rudder (vertical fins)
 
     double Y_ext = F_hydro(1) + Yvv_*x[V]*std::abs(x[V]) + Yrr*x[R]*std::abs(x[R])
         + Yv_dot*x[V_dot] + Yr_dot*x[R_dot] + Yur*x[U]*x[R] + Ywp*x[W]*x[P]
@@ -350,7 +364,7 @@ void UUV6DOF::model(const vector_t &x, vector_t &dxdt, double t) {
     double Zrp = 1.93;
     double Zuw = -28.6;
     double Zuu_delta_s = -9.64;
-    double delta_s = 0;
+    double delta_s = delta_elevator_; // horizontal fins (stern)
 
     double Z_ext = F_hydro(2) + Zww_*x[W]*std::abs(x[W]) + Zqq*x[Q]*std::abs(x[Q])
         + Zw_dot*x[W_dot] + Zq_dot*x[Q_dot] + Zuq*x[U]*x[Q] + Zvp*x[V]*x[P]
@@ -358,7 +372,7 @@ void UUV6DOF::model(const vector_t &x, vector_t &dxdt, double t) {
 
 
     double Kpp = -0.00130;
-    double Kprop = 0;// -0.543; // TODO: Proportion of thrust
+    double Kprop = -0.543; // TODO: Proportion of thrust
 
     // Roll moment
     double K_ext = Moments_hydro(0) + Kpp*x[P]*std::abs(x[P]) + Kp_dot*x[P_dot] + Kprop;

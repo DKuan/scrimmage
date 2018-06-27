@@ -37,12 +37,12 @@
   <origin_length>10</origin_length>
 
   <entity_interaction>SimpleCollision</entity_interaction>
-    
+
   <enable_screenshots min_period="1.0" start="8.3" end="15.3">false</enable_screenshots>
 
   <network>GlobalNetwork</network>
   <network>LocalNetwork</network>
-  
+
   <!-- uncomment "seed" and use integer for deterministic results -->
   <seed>2147483648</seed>
 
@@ -64,11 +64,16 @@
     <z>-5</z>
     <heading>0</heading>
 
+    <autonomy print_raw_joystick_values="false"
+                axis_map="[ throttle 2 -32767 +32767 -1 +1 -1 ]
+                          [ elevator 1 -32767 +32767 -1 +1 -1 ]
+                          [ rudder   3 -32767 +32767 -1 +1 -1 ]
+                          "
+                >JoystickAutonomy</autonomy>
     <controller>DirectController</controller>
     <motion_model>UUV6DOF</motion_model>
-    
+
     <visual_model>submarine</visual_model>
-    <autonomy>Straight</autonomy>    
   </entity>
-  
+
 </runscript>

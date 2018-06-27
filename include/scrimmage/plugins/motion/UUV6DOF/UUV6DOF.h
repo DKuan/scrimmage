@@ -87,8 +87,15 @@ class UUV6DOF : public scrimmage::motion::RigidBody6DOFBase {
     };
 
  protected:
-    double length_;
-    bool enable_gravity_;
+    int throttle_idx_ = 0;
+    int elevator_idx_ = 0;
+    int aileron_idx_ = 0;
+    int rudder_idx_ = 0;
+
+    double thrust_ = 0;
+    double throttle_ = 0;
+    double delta_elevator_ = 0;
+    double delta_rudder_ = 0;
 
     Eigen::Quaterniond rot_180_x_axis_;
 
@@ -120,6 +127,14 @@ class UUV6DOF : public scrimmage::motion::RigidBody6DOFBase {
 
     Eigen::Vector3d c_g_;
     Eigen::Vector3d c_b_;
+
+    double thrust_min_ = -2.0;
+    double thrust_max_ = +3.6936;
+    double delta_elevator_min_ = -0.2373648;
+    double delta_elevator_max_ = +0.2373648;
+    double delta_rudder_min_ = -0.2373648;
+    double delta_rudder_max_ = +0.2373648;
+
 
  private:
 };
