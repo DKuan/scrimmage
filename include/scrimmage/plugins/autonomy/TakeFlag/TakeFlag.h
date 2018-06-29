@@ -33,9 +33,9 @@
 #ifndef INCLUDE_SCRIMMAGE_PLUGINS_AUTONOMY_TAKEFLAG_TAKEFLAG_H_
 #define INCLUDE_SCRIMMAGE_PLUGINS_AUTONOMY_TAKEFLAG_TAKEFLAG_H_
 #include <scrimmage/autonomy/Autonomy.h>
-
-#include <scrimmage/plugins/interaction/Boundary/BoundaryInfo.h>
 #include <scrimmage/plugins/interaction/Boundary/BoundaryBase.h>
+#include <scrimmage/proto/Shape.pb.h>
+
 
 #include <string>
 #include <map>
@@ -58,7 +58,7 @@ class TakeFlag : public scrimmage::Autonomy {
 
     scrimmage::PublisherPtr pub_wp_list_;
 
-    std::map<int, std::pair<sci::BoundaryInfo,
+    std::map<int, std::pair<scrimmage_proto::Shape,
         std::shared_ptr<sci::BoundaryBase>>> boundaries_;
 
     bool has_flag_ = false;
