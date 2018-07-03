@@ -30,11 +30,11 @@
  *
  */
 
-#ifndef INCLUDE_SCRIMMAGE_PLUGINS_AUTONOMY_MOVETOGOALMS_MOVETOGOALMS_H_
-#define INCLUDE_SCRIMMAGE_PLUGINS_AUTONOMY_MOVETOGOALMS_MOVETOGOALMS_H_
-
-#include <scrimmage/plugins/autonomy/MotorSchemas/BehaviorBase.h>
+#ifndef INCLUDE_SCRIMMAGE_PLUGINS_AUTONOMY_WAYPOINTDISPATCHER_WAYPOINTDISPATCHER_H_
+#define INCLUDE_SCRIMMAGE_PLUGINS_AUTONOMY_WAYPOINTDISPATCHER_WAYPOINTDISPATCHER_H_
+#include <scrimmage/autonomy/Autonomy.h>
 #include <scrimmage/plugins/autonomy/WaypointGenerator/Waypoint.h>
+#include <scrimmage/plugins/autonomy/WaypointGenerator/WaypointList.h>
 
 #include <string>
 #include <map>
@@ -42,18 +42,26 @@
 
 namespace scrimmage {
 namespace autonomy {
-namespace motor_schemas {
-class MoveToGoalMS : public scrimmage::autonomy::motor_schemas::BehaviorBase {
+class WaypointDispatcher : public scrimmage::Autonomy {
  public:
-    MoveToGoalMS();
-    void init(std::map<std::string, std::string> &params) override;
-    bool step_autonomy(double t, double dt) override;
+    WaypointDispatcher();
+    virtual void init(std::map<std::string, std::string> &params);
+    virtual bool step_autonomy(double t, double dt);
 
  protected:
-    Waypoint wp_;
-    Eigen::Vector3d wp_local_;
+    WaypointList wp_list_;
+    std::list<Waypoint>::iterator wp_it_;
+    std::list<Waypoint>::iterator prev_wp_it_;
+    unsigned int cycles_ = 0;
+    bool returning_stage_ = false;
+    bool exit_on_reaching_wpt_ = false;
+    double lead_distance_ = 50;
+
+    scrimmage_proto::ShapePtr sphere_shape_ = std::make_shared<scrimmage_proto::Shape>();
+    bool show_shapes_ = false;
+
+    scrimmage::PublisherPtr wp_pub_;
 };
-} // namespace motor_schemas
 } // namespace autonomy
 } // namespace scrimmage
-#endif // INCLUDE_SCRIMMAGE_PLUGINS_AUTONOMY_MOVETOGOALMS_MOVETOGOALMS_H_
+#endif // INCLUDE_SCRIMMAGE_PLUGINS_AUTONOMY_WAYPOINTDISPATCHER_WAYPOINTDISPATCHER_H_
